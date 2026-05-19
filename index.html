@@ -628,27 +628,27 @@
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">🔥 Energie (100g)</div>
-                                            <input type="number" value={selectedFood.calories} onChange={e => setSelectedFood({...selectedFood, calories: Number(e.target.value)})} className="bg-transparent text-lg font-black text-brand-400 text-center w-full outline-none" />
+                                            <input type="number" inputMode="decimal" value={selectedFood.calories} onFocus={(e) => setTimeout(() => e.target.select(), 50)} onChange={e => setSelectedFood({...selectedFood, calories: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-lg font-black text-brand-400 text-center w-full outline-none" />
                                         </div>
                                         <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">💪 Protein (100g)</div>
-                                            <input type="number" value={selectedFood.protein} onChange={e => setSelectedFood({...selectedFood, protein: Number(e.target.value)})} className="bg-transparent text-lg font-black text-fuchsia-400 text-center w-full outline-none" />
+                                            <input type="number" inputMode="decimal" value={selectedFood.protein} onFocus={(e) => setTimeout(() => e.target.select(), 50)} onChange={e => setSelectedFood({...selectedFood, protein: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-lg font-black text-fuchsia-400 text-center w-full outline-none" />
                                         </div>
                                         <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">🍞 Carbs (100g)</div>
-                                            <input type="number" value={selectedFood.carbs} onChange={e => setSelectedFood({...selectedFood, carbs: Number(e.target.value)})} className="bg-transparent text-lg font-black text-blue-400 text-center w-full outline-none" />
+                                            <input type="number" inputMode="decimal" value={selectedFood.carbs} onFocus={(e) => setTimeout(() => e.target.select(), 50)} onChange={e => setSelectedFood({...selectedFood, carbs: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-lg font-black text-blue-400 text-center w-full outline-none" />
                                         </div>
                                         <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">🍭 Davon Zucker</div>
-                                            <input type="number" value={selectedFood.sugar} onChange={e => setSelectedFood({...selectedFood, sugar: Number(e.target.value)})} className="bg-transparent text-lg font-black text-blue-300/60 text-center w-full outline-none" />
+                                            <input type="number" inputMode="decimal" value={selectedFood.sugar} onFocus={(e) => setTimeout(() => e.target.select(), 50)} onChange={e => setSelectedFood({...selectedFood, sugar: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-lg font-black text-blue-300/60 text-center w-full outline-none" />
                                         </div>
                                         <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">🥑 Fett (100g)</div>
-                                            <input type="number" value={selectedFood.fat} onChange={e => setSelectedFood({...selectedFood, fat: Number(e.target.value)})} className="bg-transparent text-lg font-black text-amber-400 text-center w-full outline-none" />
+                                            <input type="number" inputMode="decimal" value={selectedFood.fat} onFocus={(e) => setTimeout(() => e.target.select(), 50)} onChange={e => setSelectedFood({...selectedFood, fat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-lg font-black text-amber-400 text-center w-full outline-none" />
                                         </div>
                                         <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">⚠️ Gesättigt</div>
-                                            <input type="number" value={selectedFood.saturatedFat} onChange={e => setSelectedFood({...selectedFood, saturatedFat: Number(e.target.value)})} className="bg-transparent text-lg font-black text-amber-300/60 text-center w-full outline-none" />
+                                            <input type="number" inputMode="decimal" value={selectedFood.saturatedFat} onFocus={(e) => setTimeout(() => e.target.select(), 50)} onChange={e => setSelectedFood({...selectedFood, saturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-lg font-black text-amber-300/60 text-center w-full outline-none" />
                                         </div>
                                     </div>
                                     
