@@ -312,23 +312,43 @@
             const startBarcodeScan = () => {
                 setIsScanning(true);
                 setTimeout(() => {
-                    qrInstance.current = new Html5Qrcode("qr-reader");
                     const config = { fps: 10, qrbox: { width: 250, height: 250 } };
                     
-                    // Versuche zuerst Standard-Kamera ohne experimentelle Constraints
-                    qrInstance.current.start(
-                        { facingMode: "environment" }, 
-                        config, 
-                        (text) => {
-                            fetchBarcode(text);
-                            stopBarcodeScan();
-                        }, 
-                        () => {}
-                    ).catch(err => {
-                        console.error("Kamera-Fehler:", err);
-                        alert("Kamera konnte nicht gestartet werden. Bitte Berechtigungen prüfen.");
-                        setIsScanning(false);
-                    });
+                    // Wir versuchen nacheinander die beste Konfiguration (Autofokus -> HD -> Standard)
+                    // Dies verhindert den schwarzen Bildschirm, falls ein Handy Autofokus nicht unterstützt.
+                    const attempts = [
+                        { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 }, advanced: [{ focusMode: "continuous" }] },
+                        { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
+                        { facingMode: "environment" }
+                    ];
+                    
+                    let currentAttempt = 0;
+                    
+                    const tryNext = () => {
+                        if (currentAttempt >= attempts.length) {
+                            alert("Kamera-Fehler. Bitte Berechtigungen prüfen.");
+                            setIsScanning(false);
+                            return;
+                        }
+                        
+                        if (qrInstance.current) {
+                            try { qrInstance.current.clear(); } catch(e){}
+                        }
+                        qrInstance.current = new Html5Qrcode("qr-reader");
+                        
+                        qrInstance.current.start(
+                            attempts[currentAttempt], 
+                            config, 
+                            (text) => { fetchBarcode(text); stopBarcodeScan(); }, 
+                            () => {}
+                        ).catch((err) => {
+                            console.warn(`Kamera-Versuch ${currentAttempt + 1} fehlgeschlagen, versuche Alternative...`, err);
+                            currentAttempt++;
+                            tryNext();
+                        });
+                    };
+                    
+                    tryNext();
                 }, 300);
             };
 
@@ -336,7 +356,10 @@
                 if(qrInstance.current) { 
                     qrInstance.current.stop()
                         .then(() => { qrInstance.current.clear(); setIsScanning(false); })
-                        .catch(() => setIsScanning(false)); 
+                        .catch(() => {
+                            try { qrInstance.current.clear(); } catch(e){}
+                            setIsScanning(false);
+                        }); 
                 }
             };
 
@@ -865,6 +888,7 @@
                                 </div>
                                 <div className="p-6">
                                     <div id="qr-reader" className="w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner"></div>
+                                    <p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Handy etwas weiter weg halten für Fokus</p>
                                 </div>
                             </div>
                         </div>
