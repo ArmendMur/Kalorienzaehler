@@ -116,14 +116,22 @@
             const circ = normRadius * 2 * Math.PI;
             const rawPercent = (consumed / (target || 1)) * 100 || 0;
             const isExceeded = rawPercent > 100;
-            const percent = isExceeded ? (rawPercent % 100 || 100) : rawPercent;
-            const offset = circ - (percent / 100) * circ;
+            
+            const mainPercent = Math.min(rawPercent, 100);
+            const mainOffset = circ - (mainPercent / 100) * circ;
+            
+            const excessPercent = isExceeded ? Math.min(rawPercent - 100, 100) : 0;
+            const excessOffset = circ - (excessPercent / 100) * circ;
+
             const diff = target - consumed;
             return (
                 <div className="relative flex items-center justify-center">
                     <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
                         <circle stroke="#1e293b" strokeWidth={12} fill="transparent" r={normRadius} cx={radius} cy={radius} />
-                        <circle stroke={isExceeded ? "#ef4444" : "#8b5cf6"} strokeWidth={12} strokeDasharray={circ} style={{ strokeDashoffset: offset, transition: 'stroke-dashoffset 0.8s' }} strokeLinecap="round" fill="transparent" r={normRadius} cx={radius} cy={radius} />
+                        <circle stroke="#8b5cf6" strokeWidth={12} strokeDasharray={circ} style={{ strokeDashoffset: mainOffset, transition: 'stroke-dashoffset 0.8s' }} strokeLinecap="round" fill="transparent" r={normRadius} cx={radius} cy={radius} />
+                        {isExceeded && (
+                            <circle stroke="#ef4444" strokeWidth={12} strokeDasharray={circ} style={{ strokeDashoffset: excessOffset, transition: 'stroke-dashoffset 0.8s' }} strokeLinecap="round" fill="transparent" r={normRadius} cx={radius} cy={radius} />
+                        )}
                     </svg>
                     <div className="absolute text-center">
                         <div className="text-3xl font-black text-white tracking-tighter">{Math.round(consumed)}</div>
@@ -138,15 +146,26 @@
         const MacroBar = ({ label, value, target, color }) => {
             const rawPercent = (value / (target || 1)) * 100 || 0;
             const isExceeded = rawPercent > 100;
-            const percent = isExceeded ? (rawPercent % 100 || 100) : rawPercent;
+            const mainPercent = Math.min(rawPercent, 100);
+            const excessPercent = isExceeded ? Math.min(rawPercent - 100, 100) : 0;
+            
             return (
                 <div className="space-y-1.5">
                     <div className="flex justify-between items-end px-1">
                         <span className="text-[9px] font-black uppercase tracking-wider text-white">{label}</span>
                         <span className="text-[10px] font-bold text-white">{Math.round(value)}g <span>/ {target}g</span></span>
                     </div>
-                    <div className="h-1.5 w-full bg-slate-800/50 rounded-full overflow-hidden">
-                        <div className={`h-full ${isExceeded ? 'bg-rose-500' : color} rounded-full transition-all duration-1000`} style={{ width: `${percent}%` }}></div>
+                    <div className="h-1.5 w-full bg-slate-800/50 rounded-full overflow-hidden relative">
+                        <div 
+                            className={`h-full ${color} rounded-full transition-all duration-1000 absolute top-0 left-0`} 
+                            style={{ width: `${mainPercent}%` }}
+                        ></div>
+                        {isExceeded && (
+                            <div 
+                                className="h-full bg-rose-500 rounded-full transition-all duration-1000 absolute top-0 left-0" 
+                                style={{ width: `${excessPercent}%` }}
+                            ></div>
+                        )}
                     </div>
                 </div>
             );
