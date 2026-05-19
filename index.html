@@ -634,21 +634,21 @@
                                             <div className="text-[8px] font-black text-slate-500 uppercase">💪 Protein (100g)</div>
                                             <input type="number" value={selectedFood.protein} onChange={e => setSelectedFood({...selectedFood, protein: Number(e.target.value)})} className="bg-transparent text-lg font-black text-fuchsia-400 text-center w-full outline-none" />
                                         </div>
-                                        <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center col-span-2 flex flex-col items-center">
-                                            <div className="text-[8px] font-black text-slate-500 uppercase">🍞 Kohlenhydrate (100g)</div>
-                                            <div className="flex items-center gap-2">
-                                                <input type="number" value={selectedFood.carbs} onChange={e => setSelectedFood({...selectedFood, carbs: Number(e.target.value)})} className="bg-transparent text-lg font-black text-blue-400 text-center w-20 outline-none" />
-                                                <div className="text-[8px] font-black text-slate-700 uppercase">davon Zucker</div>
-                                                <input type="number" value={selectedFood.sugar} onChange={e => setSelectedFood({...selectedFood, sugar: Number(e.target.value)})} className="bg-transparent text-lg font-black text-blue-300/60 text-center w-20 outline-none" />
-                                            </div>
+                                        <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase">🍞 Carbs (100g)</div>
+                                            <input type="number" value={selectedFood.carbs} onChange={e => setSelectedFood({...selectedFood, carbs: Number(e.target.value)})} className="bg-transparent text-lg font-black text-blue-400 text-center w-full outline-none" />
                                         </div>
-                                        <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center col-span-2 flex flex-col items-center">
+                                        <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase">🍭 Davon Zucker</div>
+                                            <input type="number" value={selectedFood.sugar} onChange={e => setSelectedFood({...selectedFood, sugar: Number(e.target.value)})} className="bg-transparent text-lg font-black text-blue-300/60 text-center w-full outline-none" />
+                                        </div>
+                                        <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
                                             <div className="text-[8px] font-black text-slate-500 uppercase">🥑 Fett (100g)</div>
-                                            <div className="flex items-center gap-2">
-                                                <input type="number" value={selectedFood.fat} onChange={e => setSelectedFood({...selectedFood, fat: Number(e.target.value)})} className="bg-transparent text-lg font-black text-amber-400 text-center w-20 outline-none" />
-                                                <div className="text-[8px] font-black text-slate-700 uppercase">davon gesättigt</div>
-                                                <input type="number" value={selectedFood.saturatedFat} onChange={e => setSelectedFood({...selectedFood, saturatedFat: Number(e.target.value)})} className="bg-transparent text-lg font-black text-amber-300/60 text-center w-20 outline-none" />
-                                            </div>
+                                            <input type="number" value={selectedFood.fat} onChange={e => setSelectedFood({...selectedFood, fat: Number(e.target.value)})} className="bg-transparent text-lg font-black text-amber-400 text-center w-full outline-none" />
+                                        </div>
+                                        <div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center">
+                                            <div className="text-[8px] font-black text-slate-500 uppercase">⚠️ Gesättigt</div>
+                                            <input type="number" value={selectedFood.saturatedFat} onChange={e => setSelectedFood({...selectedFood, saturatedFat: Number(e.target.value)})} className="bg-transparent text-lg font-black text-amber-300/60 text-center w-full outline-none" />
                                         </div>
                                     </div>
                                     
