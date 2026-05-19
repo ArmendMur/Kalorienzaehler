@@ -448,7 +448,20 @@
             };
 
             const selectFood = (food) => {
-                setSelectedFood(food);
+                setSelectedFood({
+                    name: food.name,
+                    emoji: food.emoji,
+                    image: food.image,
+                    isBarcode: food.isBarcode,
+                    isAi: food.isAi,
+                    calories: Number(food.baseCalories ?? food.calories ?? 0),
+                    protein: Number(food.baseProtein ?? food.protein ?? 0),
+                    carbs: Number(food.baseCarbs ?? food.carbs ?? 0),
+                    sugar: Number(food.baseSugar ?? food.sugar ?? 0),
+                    fat: Number(food.baseFat ?? food.fat ?? 0),
+                    saturatedFat: Number(food.baseSaturatedFat ?? food.saturatedFat ?? 0),
+                    unsaturatedFat: Number(food.baseUnsaturatedFat ?? food.unsaturatedFat ?? 0)
+                });
                 setAmount(food.lastAmount || 100);
             };
 
@@ -463,7 +476,9 @@
                     saturatedFat: item.baseSaturatedFat,
                     unsaturatedFat: item.baseUnsaturatedFat,
                     emoji: item.emoji,
-                    image: item.image
+                    image: item.image,
+                    isBarcode: item.isBarcode,
+                    isAi: item.isAi
                 });
                 setAmount(Math.round(item.amountFactor * 100));
                 setEditingInstanceId(item.instanceId);
@@ -477,14 +492,14 @@
                 const baseProps = {
                     name: food.name || "Unbekannt",
                     emoji: food.emoji || "🍽️",
-                    calories: Number(food.baseCalories ?? food.calories ?? 0),
-                    protein: Number(food.baseProtein ?? food.protein ?? 0),
-                    carbs: Number(food.baseCarbs ?? food.carbs ?? 0),
-                    sugar: Number(food.baseSugar ?? food.sugar ?? 0),
-                    fat: Number(food.baseFat ?? food.fat ?? 0),
-                    saturatedFat: Number(food.baseSaturatedFat ?? food.saturatedFat ?? 0)
+                    calories: Number(food.calories || 0),
+                    protein: Number(food.protein || 0),
+                    carbs: Number(food.carbs || 0),
+                    sugar: Number(food.sugar || 0),
+                    fat: Number(food.fat || 0),
+                    saturatedFat: Number(food.saturatedFat || 0)
                 };
-                baseProps.unsaturatedFat = Number(food.baseUnsaturatedFat ?? food.unsaturatedFat ?? (baseProps.fat - baseProps.saturatedFat));
+                baseProps.unsaturatedFat = Math.max(0, baseProps.fat - baseProps.saturatedFat);
 
                 const entry = { 
                     name: baseProps.name,
