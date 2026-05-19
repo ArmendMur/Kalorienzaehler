@@ -313,23 +313,21 @@
                 setIsScanning(true);
                 setTimeout(() => {
                     qrInstance.current = new Html5Qrcode("qr-reader");
+                    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                    
+                    // Versuche zuerst Standard-Kamera ohne experimentelle Constraints
                     qrInstance.current.start(
-                        { facingMode: "environment", focusMode: "continuous" }, 
-                        { fps: 10, qrbox: 250 }, 
+                        { facingMode: "environment" }, 
+                        config, 
                         (text) => {
                             fetchBarcode(text);
                             stopBarcodeScan();
                         }, 
                         () => {}
-                    ).catch(() => { 
-                        // Zweiter Versuch mit einfacheren Constraints falls focusMode nicht unterstützt wird
-                        qrInstance.current.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (text) => {
-                            fetchBarcode(text);
-                            stopBarcodeScan();
-                        }, () => {}).catch(() => {
-                            alert("Kamera-Fehler. Berechtigung erteilt?"); 
-                            setIsScanning(false); 
-                        });
+                    ).catch(err => {
+                        console.error("Kamera-Fehler:", err);
+                        alert("Kamera konnte nicht gestartet werden. Bitte Berechtigungen prüfen.");
+                        setIsScanning(false);
                     });
                 }, 300);
             };
