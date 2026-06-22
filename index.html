@@ -326,7 +326,10 @@
                 }), { kcal: 0, p: 0, c: 0, s: 0, f: 0, sf: 0, uf: 0 });
             }, [dailyLog]);
 
-            const frequentItems = useMemo(() => (Array.isArray(itemHistory) ? itemHistory : []).slice(0, 5), [itemHistory]);
+            const frequentItems = useMemo(() => {
+                const history = Array.isArray(itemHistory) ? [...itemHistory] : [];
+                return history.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 30);
+            }, [itemHistory]);
 
             const startBarcodeScan = () => {
                 setIsScanning(true);
@@ -543,14 +546,16 @@
                     setDailyLog(prev => ({ ...prev, items: (prev.items || []).map(i => i.instanceId === editingInstanceId ? entry : i) }));
                     setItemHistory(prev => {
                         const safePrev = Array.isArray(prev) ? prev : [];
-                        return safePrev.map(i => i.name === food.name || i.name === baseProps.name ? { ...entry, id: i.id || generateId(), lastAmount: safeAmount } : i);
+                        return safePrev.map(i => i.name === food.name || i.name === baseProps.name ? { ...entry, id: i.id || generateId(), lastAmount: safeAmount, count: i.count || 1 } : i);
                     });
                 } else {
                     setDailyLog(prev => ({ ...prev, items: [...(prev.items || []), entry] }));
                     setItemHistory(prev => {
                         const safePrev = Array.isArray(prev) ? prev : [];
+                        const existing = safePrev.find(i => i?.name === baseProps.name);
+                        const newCount = existing && existing.count ? existing.count + 1 : 1;
                         const filtered = safePrev.filter(i => i?.name !== baseProps.name);
-                        return [{ ...entry, lastAmount: safeAmount, id: generateId() }, ...filtered].slice(0, 50); 
+                        return [{ ...entry, lastAmount: safeAmount, id: generateId(), count: newCount }, ...filtered].slice(0, 50); 
                     });
                 }
                 
