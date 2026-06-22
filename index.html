@@ -326,7 +326,7 @@
                 }), { kcal: 0, p: 0, c: 0, s: 0, f: 0, sf: 0, uf: 0 });
             }, [dailyLog]);
 
-            const frequentItems = useMemo(() => (Array.isArray(itemHistory) ? itemHistory : []).slice(0, 5), [itemHistory]);
+            const frequentItems = useMemo(() => (Array.isArray(itemHistory) ? itemHistory : []).slice(0, 30), [itemHistory]);
 
             const startBarcodeScan = () => {
                 setIsScanning(true);
@@ -807,7 +807,7 @@
                             {!searchQuery && apiResults.length === 0 && (
                                 <div className="space-y-4">
                                     <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">⭐ Häufig gegessen</h3>
-                                    <div className="space-y-3">
+                                    <div className="space-y-3 max-h-[50vh] overflow-y-auto overscroll-contain pr-1">
                                         {frequentItems.map(item => (
                                             <div 
                                                 key={item.name} 
