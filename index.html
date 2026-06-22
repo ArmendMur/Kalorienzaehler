@@ -328,7 +328,7 @@
 
             const frequentItems = useMemo(() => {
                 const history = Array.isArray(itemHistory) ? [...itemHistory] : [];
-                return history.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 30);
+                return history.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 20);
             }, [itemHistory]);
 
             const startBarcodeScan = () => {
