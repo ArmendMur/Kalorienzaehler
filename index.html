@@ -93,6 +93,7 @@ const BarcodeIcon = p => html`<${Icon} d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 
 const SearchIcon = p => html`<${Icon} d="m21 21-4.3-4.3M19 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" ...${p}/>`;
 const TrashIcon = p => html`<${Icon} d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" ...${p}/>`;
 const ArrowLeftIcon = p => html`<${Icon} d="m12 19-7-7 7-7M19 12H5" ...${p}/>`;
+const ArrowRightIcon = p => html`<${Icon} d="m12 5 7 7-7 7M5 12h14" ...${p}/>`;
 const CheckIcon = p => html`<${Icon} d="m20 6-11 11-5-5" ...${p}/>`;
 const LoaderIcon = p => html`<${Icon} d="M21 12a9 9 0 1 1-6.219-8.56" ...${p} className="spinner"/>`;
 
@@ -125,6 +126,12 @@ const resizeImage = file => {
 };
 
 // --- COMPONENTS ---
+
+const getLocalToday = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().split('T')[0];
+};
 
 const AnimatedNumber = ({ value }) => {
   const [display, setDisplay] = useState(value);
@@ -216,6 +223,18 @@ const GoalInput = ({
 
 // --- MAIN APP ---
 function App() {
+  const [activeTab, setActiveTab] = useState('frequent');
+  const [aiGoalForm, setAiGoalForm] = useState({ age: 30, gender: 'männlich', height: 183, weight: 80, activity: 'IT-Job (sitze viel vorm PC), aber mache 2x die Woche Sport/Schwimmen', goal: 'abnehmen' });
+  const [isAiGoalLoading, setIsAiGoalLoading] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth());
+  const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear());
+  const [showAiCoach, setShowAiCoach] = useState(false);
+  const [aiCoachStart, setAiCoachStart] = useState(() => getLocalToday());
+  const [aiCoachEnd, setAiCoachEnd] = useState(() => getLocalToday());
+  const [aiCoachResult, setAiCoachResult] = useState(null);
+  const [isAiCoachLoading, setIsAiCoachLoading] = useState(false);
+
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('kTrackUser');
     return saved && saved !== "null" ? JSON.parse(saved) : {
@@ -227,15 +246,31 @@ function App() {
       geminiApiKey: ''
     };
   });
-  const [dailyLog, setDailyLog] = useState(() => {
-    const savedRaw = localStorage.getItem('kTrackLog');
-    const saved = savedRaw && savedRaw !== "null" ? JSON.parse(savedRaw) : null;
-    const today = new Date().toISOString().split('T')[0];
-    return saved && saved.date === today && Array.isArray(saved.items) ? saved : {
-      date: today,
-      items: []
-    };
+  const [allLogs, setAllLogs] = useState(() => {
+    const savedRaw = localStorage.getItem('kTrackAllLogs');
+    if (savedRaw && savedRaw !== "null") return JSON.parse(savedRaw);
+    const oldLogRaw = localStorage.getItem('kTrackLog');
+    if (oldLogRaw && oldLogRaw !== "null") {
+      const oldLog = JSON.parse(oldLogRaw);
+      if (oldLog && oldLog.date) return { [oldLog.date]: oldLog };
+    }
+    return {};
   });
+  const [selectedDate, setSelectedDate] = useState(() => getLocalToday());
+  const dailyLog = allLogs[selectedDate] || { date: selectedDate, items: [] };
+
+  const setDailyLog = useCallback((updater) => {
+    setAllLogs(prevLogs => {
+      const prevDaily = prevLogs[selectedDate] || { date: selectedDate, items: [] };
+      const nextDaily = typeof updater === 'function' ? updater(prevDaily) : updater;
+      if (!nextDaily.items || nextDaily.items.length === 0) {
+         const newLogs = { ...prevLogs };
+         delete newLogs[selectedDate];
+         return newLogs;
+      }
+      return { ...prevLogs, [selectedDate]: nextDaily };
+    });
+  }, [selectedDate]);
   const [itemHistory, setItemHistory] = useState(() => {
     const savedRaw = localStorage.getItem('kTrackHistory');
     const saved = savedRaw && savedRaw !== "null" ? JSON.parse(savedRaw) : null;
@@ -245,8 +280,14 @@ function App() {
     localStorage.setItem('kTrackUser', JSON.stringify(user));
   }, [user]);
   useEffect(() => {
-    localStorage.setItem('kTrackLog', JSON.stringify(dailyLog));
-  }, [dailyLog]);
+    const cleanLogs = {};
+    for (const key in allLogs) {
+      if (allLogs[key] && allLogs[key].items && allLogs[key].items.length > 0) {
+        cleanLogs[key] = allLogs[key];
+      }
+    }
+    localStorage.setItem('kTrackAllLogs', JSON.stringify(cleanLogs));
+  }, [allLogs]);
   useEffect(() => {
     localStorage.setItem('kTrackHistory', JSON.stringify(itemHistory));
   }, [itemHistory]);
@@ -359,6 +400,102 @@ function App() {
     const history = Array.isArray(itemHistory) ? [...itemHistory] : [];
     return history.sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 20);
   }, [itemHistory]);
+  const recentItems = useMemo(() => {
+    const history = Array.isArray(itemHistory) ? itemHistory : [];
+    return history.slice(0, 20);
+  }, [itemHistory]);
+
+  const calculateGoalsViaAi = async () => {
+    if (!user.geminiApiKey) return alert("Bitte hinterlege deinen API Key unten im Profil!");
+    setIsAiGoalLoading(true);
+    try {
+      const prompt = `Du bist ein präziser Ernährungsrechner. Berechne basierend auf folgenden Nutzerdaten den täglichen Kalorienbedarf (target) sowie die optimalen Makronährstoff-Ziele für Protein (targetP), Kohlenhydrate (targetC) und Fett (targetF) in Gramm.
+WICHTIG: Wenn das Ziel 'Abnehmen & Muskelaufbau gleichzeitig' lautet, wähle einen intelligenten Verteilungsschlüssel für eine Body Recomposition (deutlich höherer Proteinfokus bei moderatem Kaloriendefizit). Berücksichtige die im Freitext beschriebene Aktivität exakt für den Leistungsumsatz.
+Daten: Alter: ${aiGoalForm.age}, Geschlecht: ${aiGoalForm.gender}, Größe: ${aiGoalForm.height}cm, Gewicht: ${aiGoalForm.weight}kg, Aktivität/Sport: ${aiGoalForm.activity}, Ziel: ${aiGoalForm.goal}.
+Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
+{"target": int, "targetP": int, "targetC": int, "targetF": int}`;
+      
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${user.geminiApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      
+      const textContent = data.candidates[0].content.parts[0].text;
+      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Die KI hat kein erkennbares Format geliefert.");
+      
+      const goals = JSON.parse(jsonMatch[0]);
+      if (goals.target && goals.targetP && goals.targetC && goals.targetF) {
+        setUser(prev => ({
+          ...prev,
+          target: Number(goals.target),
+          targetP: Number(goals.targetP),
+          targetC: Number(goals.targetC),
+          targetF: Number(goals.targetF)
+        }));
+        alert("Ziele erfolgreich berechnet und übernommen!");
+      } else {
+        throw new Error("Fehlende Werte im JSON der KI.");
+      }
+    } catch(e) {
+      alert("Fehler bei der KI-Berechnung: " + e.message);
+    } finally {
+      setIsAiGoalLoading(false);
+    }
+  };
+
+  const runAiCoach = async () => {
+    if (!user.geminiApiKey) return alert("Bitte hinterlege deinen API Key im Profil!");
+    setIsAiCoachLoading(true);
+    setAiCoachResult(null);
+    try {
+      const days = [];
+      const start = new Date(aiCoachStart);
+      const end = new Date(aiCoachEnd);
+      if (end < start) throw new Error("Das Enddatum darf nicht vor dem Startdatum liegen.");
+      
+      for (const date in allLogs) {
+         const d = new Date(date);
+         if (d >= start && d <= end && allLogs[date].items && allLogs[date].items.length > 0) {
+           days.push(allLogs[date]);
+         }
+      }
+      if (days.length === 0) throw new Error("Keine Daten in diesem Zeitraum.");
+
+      const prompt = `Du bist ein kreativer, smarter und professioneller Ernährungsberater. Analysiere die Ernährungshistorie des Nutzers im angegebenen Zeitraum. Sei direkt, präzise und visuell auf den Punkt. Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt im folgenden Format:
+      {
+        "score": int (Ein Health-Score von 1 bis 100),
+        "good": ["Was war gut Punkt 1", "Was war gut Punkt 2"],
+        "bad": ["Was war schlecht Punkt 1", "Was war schlecht Punkt 2"],
+        "verdict": "Ein kurzes, knackiges, kluges Gesamtfazit",
+        "tips": ["Konkreter Verbesserungstipp 1", "Konkreter Verbesserungstipp 2"]
+      }
+      
+      Daten: ${JSON.stringify(days.map(d => ({
+        date: d.date,
+        items: d.items.map(i => ({ name: i.name, cal: i.calories, p: i.protein, c: i.carbs, f: i.fat }))
+      })))}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${user.geminiApiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      const textContent = data.candidates[0].content.parts[0].text;
+      const jsonMatch = textContent.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("Die KI hat kein erkennbares Format geliefert.");
+      setAiCoachResult(JSON.parse(jsonMatch[0]));
+    } catch(e) {
+      alert("Fehler bei der Analyse: " + e.message);
+    } finally {
+      setIsAiCoachLoading(false);
+    }
+  };
   const startBarcodeScan = () => {
     setIsScanning(true);
     setTimeout(() => {
@@ -711,14 +848,30 @@ function App() {
   })} className="bg-transparent text-lg font-black text-amber-400 text-center w-full outline-none"/></div><div className="p-3 bg-slate-900/50 rounded-xl border border-white/5 text-center"><div className="text-[8px] font-black text-slate-500 uppercase">⚠️ Gesättigt</div><input type="number" inputMode="decimal" value=${selectedFood.saturatedFat} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({
     ...selectedFood,
     saturatedFat: e.target.value.replace(/^0+(?=\d)/, '')
-  })} className="bg-transparent text-lg font-black text-amber-300/60 text-center w-full outline-none"/></div></div><div className="text-center p-4 bg-slate-900/30 rounded-2xl border border-white/5"><div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Berechnet für ${amount}g</div><div className="text-2xl font-black text-white">${Math.round(selectedFood.calories * ((amount || 0) / 100))} <span className="text-xs text-brand-400">kcal</span></div></div></div><button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button></div>`}${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><p className="text-[10px] font-black text-slate-600 uppercase tracking-widest mt-1">Heute, ${new Date().toLocaleDateString('de-DE', {
-    day: '2-digit',
-    month: 'short'
-  })}</p></div><button onClick=${() => setView('profile')} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg"><${UserIcon} size=${20} className="text-brand-400"/></button></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 davon Zucker" value=${totals.s} color="text-rose-400/60"/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="⚠️ davon gesättigt" value=${totals.sf} color="text-rose-400/60"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-emerald-400/60"/></div></div></div></div>
+  })} className="bg-transparent text-lg font-black text-amber-300/60 text-center w-full outline-none"/></div></div><div className="text-center p-4 bg-slate-900/30 rounded-2xl border border-white/5"><div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Berechnet für ${amount}g</div><div className="text-2xl font-black text-white">${Math.round(selectedFood.calories * ((amount || 0) / 100))} <span className="text-xs text-brand-400">kcal</span></div></div></div><button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button></div>`}${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
+  <button onClick=${() => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  }} className="p-1 text-slate-500 hover:text-white active:scale-90 transition-all"><${ArrowLeftIcon} size=${14}/></button>
+  <button onClick=${() => {
+    const d = new Date(selectedDate);
+    setCalendarMonth(d.getMonth());
+    setCalendarYear(d.getFullYear());
+    setShowCalendarModal(true);
+  }} className="text-[10px] font-black text-brand-400 uppercase tracking-widest min-w-[70px] text-center bg-brand-500/10 px-3 py-1.5 rounded-full hover:bg-brand-500/20 active:scale-95 transition-all">
+    ${selectedDate === getLocalToday() ? 'Heute, ' : ''}${new Date(selectedDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}
+  </button>
+  <button onClick=${() => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  }} className="p-1 text-slate-500 hover:text-white active:scale-90 transition-all"><${ArrowRightIcon} size=${14}/></button>
+</div></div><div className="flex gap-2"><button onClick=${() => setShowAiCoach(true)} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400"><${SparklesIcon} size=${20}/></button><button onClick=${() => setView('profile')} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 davon Zucker" value=${totals.s} color="text-rose-400/60"/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="⚠️ davon gesättigt" value=${totals.sf} color="text-rose-400/60"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-emerald-400/60"/></div></div></div></div>
 <button onClick=${() => { if(navigator.vibrate) navigator.vibrate(50); setView('addFood'); }} className="fixed bottom-6 right-6 z-[100] w-16 h-16 bg-brand-500 text-slate-950 rounded-[2rem] flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.4)] active:scale-90 transition-all border border-brand-400">
     <${PlusIcon} size=${30} strokeWidth=${3} />
 </button>
-<div className="space-y-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-4">📅 Tagebuch</h3><div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge heute</div>` : [...dailyLog.items].reverse().map(item => html`<div key=${item.instanceId} onClick=${() => setShowDetails(item)} className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center active:scale-[0.98] transition-all cursor-pointer mb-3">
+<div className="space-y-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-4">📅 Tagebuch</h3><div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<div key=${item.instanceId} onClick=${() => setShowDetails(item)} className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center active:scale-[0.98] transition-all cursor-pointer mb-3">
     <div className="flex items-center gap-4">
         <div className="w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center text-xl border border-white/5 shadow-inner">
             ${getItemDisplay(item)}
@@ -755,7 +908,7 @@ function App() {
       setAiImage(base64);
       setShowAiModal(true);
     }
-  }}/></div>${!searchQuery && apiResults.length === 0 && html`<div className="space-y-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-2">⭐ Häufig gegessen</h3><div className="space-y-3">${frequentItems.map(item => html`<div key=${item.name} className="relative overflow-hidden rounded-[1.5rem]" onTouchStart=${e => touchStart.current = e.touches[0].clientX} onTouchEnd=${e => {
+  }}/></div>${!searchQuery && apiResults.length === 0 && html`<div className="space-y-4"><div className="flex gap-2 p-1 bg-slate-900 rounded-2xl border border-white/5 mx-1"><button onClick=${() => setActiveTab('frequent')} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'frequent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>⭐ Häufig</button><button onClick=${() => setActiveTab('recent')} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'recent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>🕒 Zuletzt</button></div><div className="space-y-3">${(activeTab === 'frequent' ? frequentItems : recentItems).map(item => html`<div key=${item.name} className="relative overflow-hidden rounded-[1.5rem]" onTouchStart=${e => touchStart.current = e.touches[0].clientX} onTouchEnd=${e => {
     const delta = touchStart.current - e.changedTouches[0].clientX;
     if (delta > 80) setSwipeId(item.name);
     if (delta < -80) setSwipeId(null);
@@ -771,7 +924,49 @@ function App() {
   }} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button></div><img src=${aiImage} className="w-full h-24 object-cover rounded-3xl border border-white/10 shadow-2xl"/><textarea placeholder="Was genau ist zu sehen?..." value=${aiDesc} onChange=${e => setAiDesc(e.target.value)} onBlur=${() => window.scrollTo(0, 0)} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none text-sm h-20 font-medium text-white shadow-inner"/><div className="flex flex-col gap-3"><button type="button" onPointerDown=${handleSafeAction(() => !isThinking && askGemini(aiDesc, aiImage))} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all touch-manipulation shadow-xl">${isThinking ? html`<${LoaderIcon} size=${20}/>` : html`<${CheckIcon} size=${20}/> Absenden`}</button><button type="button" onClick=${() => {
     setShowAiModal(false);
     setAiImage(null);
-  }} className="w-full py-2 text-slate-500 font-bold text-xs uppercase tracking-widest">Abbrechen</button></div></div>`}${view === 'profile' && html`<div className="animate-in slide-in-from-right duration-300"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => setView('dashboard')} className="p-4 glass-card rounded-2xl active:scale-90"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Ziele</h2></div><div className="glass-card p-8 rounded-[3rem] space-y-6 shadow-2xl border border-white/10 overflow-y-auto max-h-[75vh]"><${GoalInput} label="Energie (kcal)" value=${user.target} color="text-brand-400" onChange=${v => setUser({
+  }} className="w-full py-2 text-slate-500 font-bold text-xs uppercase tracking-widest">Abbrechen</button></div></div>`}${view === 'profile' && html`<div className="animate-in slide-in-from-right duration-300"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => setView('dashboard')} className="p-4 glass-card rounded-2xl active:scale-90"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Ziele</h2></div><div className="glass-card p-8 rounded-[3rem] space-y-6 shadow-2xl border border-white/10 overflow-y-auto max-h-[75vh]">
+  
+  <div className="p-5 bg-slate-900/80 rounded-[2rem] border border-white/5 space-y-4 mb-8">
+    <h3 className="text-sm font-black text-white flex items-center gap-2"><span className="text-lg">🤖</span> KI-Ziele-Assistent</h3>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-1">
+        <label className="text-[9px] font-black text-slate-500 uppercase">Alter</label>
+        <input type="number" value=${aiGoalForm.age} onChange=${e => setAiGoalForm({...aiGoalForm, age: Number(e.target.value)})} className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-white outline-none text-xs"/>
+      </div>
+      <div className="space-y-1">
+        <label className="text-[9px] font-black text-slate-500 uppercase">Geschlecht</label>
+        <select value=${aiGoalForm.gender} onChange=${e => setAiGoalForm({...aiGoalForm, gender: e.target.value})} className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-white outline-none text-xs appearance-none">
+          <option value="männlich">männlich</option><option value="weiblich">weiblich</option>
+        </select>
+      </div>
+      <div className="space-y-1">
+        <label className="text-[9px] font-black text-slate-500 uppercase">Größe (cm)</label>
+        <input type="number" value=${aiGoalForm.height} onChange=${e => setAiGoalForm({...aiGoalForm, height: Number(e.target.value)})} className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-white outline-none text-xs"/>
+      </div>
+      <div className="space-y-1">
+        <label className="text-[9px] font-black text-slate-500 uppercase">Gewicht (kg)</label>
+        <input type="number" value=${aiGoalForm.weight} onChange=${e => setAiGoalForm({...aiGoalForm, weight: Number(e.target.value)})} className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-white outline-none text-xs"/>
+      </div>
+      <div className="space-y-1 col-span-2">
+        <label className="text-[9px] font-black text-slate-500 uppercase">Aktivität / Sport</label>
+        <textarea value=${aiGoalForm.activity} onChange=${e => setAiGoalForm({...aiGoalForm, activity: e.target.value})} rows="2" className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-white outline-none text-xs resize-none" placeholder="Beschreibe deinen Alltag & Sport..."></textarea>
+      </div>
+      <div className="space-y-1 col-span-2">
+        <label className="text-[9px] font-black text-slate-500 uppercase">Ziel</label>
+        <select value=${aiGoalForm.goal} onChange=${e => setAiGoalForm({...aiGoalForm, goal: e.target.value})} className="w-full p-3 bg-slate-950 border border-white/5 rounded-xl text-white outline-none text-xs appearance-none">
+          <option value="abnehmen">Abnehmen (Defizit)</option>
+          <option value="Abnehmen & Muskelaufbau gleichzeitig">Abnehmen & Muskelaufbau (Recomp)</option>
+          <option value="Gewicht halten">Gewicht halten</option>
+          <option value="Muskelaufbau">Muskelaufbau (Überschuss)</option>
+        </select>
+      </div>
+    </div>
+    <button onClick=${calculateGoalsViaAi} className="w-full py-4 bg-brand-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
+      ${isAiGoalLoading ? html`<${LoaderIcon} size=${16}/>` : html`<${SparklesIcon} size=${16}/> Ziele via KI berechnen`}
+    </button>
+  </div>
+
+  <${GoalInput} label="Energie (kcal)" value=${user.target} color="text-brand-400" onChange=${v => setUser({
     ...user,
     target: v
   })}/><div className="grid grid-cols-2 gap-4"><${GoalInput} label="💪 Protein (g)" value=${user.targetP} color="text-fuchsia-400" onChange=${v => setUser({
@@ -791,7 +986,182 @@ function App() {
       localStorage.clear();
       window.location.reload();
     }
-  }} className="w-full bg-rose-500/5 border border-rose-500/20 text-rose-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest mt-4 active:bg-rose-500/10 transition-all">Reset</button></div></div>`}${isScanning && html`<div className="fixed inset-0 bg-slate-950 z-[300] flex flex-col items-center justify-center p-6 backdrop-blur-3xl animate-in zoom-in duration-300"><div className="w-full max-w-md glass-card rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl"><div className="flex justify-between items-center p-8 bg-slate-900/50"><h3 className="font-black text-xl text-white flex items-center gap-3"><${BarcodeIcon} size=${24} className="text-brand-400"/> Scan</h3><button onClick=${stopBarcodeScan} className="p-2 bg-slate-800 rounded-full active:scale-90 transition-all"><${XIcon} size=${20}/></button></div><div className="p-6"><div id="qr-reader" className="w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner"/><p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Handy etwas weiter weg halten für Fokus</p></div></div></div>`}</div>`;
+  }} className="w-full bg-rose-500/5 border border-rose-500/20 text-rose-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest mt-4 active:bg-rose-500/10 transition-all">Reset</button>
+  <div className="flex gap-3 mt-4">
+    <button onClick=${() => {
+      const data = {
+        user: JSON.parse(localStorage.getItem('kTrackUser') || '{}'),
+        history: JSON.parse(localStorage.getItem('kTrackHistory') || '[]'),
+        logs: JSON.parse(localStorage.getItem('kTrackAllLogs') || '{}'),
+      };
+      const oldLogRaw = localStorage.getItem('kTrackLog');
+      if (oldLogRaw && oldLogRaw !== "null") data.oldLog = JSON.parse(oldLogRaw);
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'kalorien_tracker_backup.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }} className="flex-1 bg-slate-800/50 border border-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:bg-slate-800 transition-all">Exportieren</button>
+    <button onClick=${() => document.getElementById('import-file').click()} className="flex-1 bg-slate-800/50 border border-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:bg-slate-800 transition-all">Importieren</button>
+    <input type="file" id="import-file" accept=".json" className="hidden" onChange=${(e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.user) localStorage.setItem('kTrackUser', JSON.stringify(data.user));
+          if (data.history) localStorage.setItem('kTrackHistory', JSON.stringify(data.history));
+          if (data.logs) localStorage.setItem('kTrackAllLogs', JSON.stringify(data.logs));
+          alert("Erfolgreich importiert!");
+          window.location.reload();
+        } catch(err) {
+          alert("Fehler beim Import: Ungültige Datei");
+        }
+      };
+      reader.readAsText(file);
+    }}/>
+  </div>
+  </div></div>`}${isScanning && html`<div className="fixed inset-0 bg-slate-950 z-[300] flex flex-col items-center justify-center p-6 backdrop-blur-3xl animate-in zoom-in duration-300"><div className="w-full max-w-md glass-card rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl"><div className="flex justify-between items-center p-8 bg-slate-900/50"><h3 className="font-black text-xl text-white flex items-center gap-3"><${BarcodeIcon} size=${24} className="text-brand-400"/> Scan</h3><button onClick=${stopBarcodeScan} className="p-2 bg-slate-800 rounded-full active:scale-90 transition-all"><${XIcon} size=${20}/></button></div><div className="p-6"><div id="qr-reader" className="w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner"/><p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Handy etwas weiter weg halten für Fokus</p></div></div></div>`}
+
+${showCalendarModal && (() => {
+  const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(calendarYear, calendarMonth, 1).getDay();
+  const startOffset = (firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1);
+  
+  const days = [];
+  for (let i = 0; i < startOffset; i++) days.push(null);
+  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+
+  const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+  return html`
+    <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => setShowCalendarModal(false)}/>
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-[410] glass-card rounded-[3rem] p-6 space-y-4 animate-in slide-up duration-300 shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-2">
+        <button onClick=${() => {
+          if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(calendarYear - 1); }
+          else { setCalendarMonth(calendarMonth - 1); }
+        }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all"><${ArrowLeftIcon} size=${16}/></button>
+        <h3 className="text-lg font-black text-white">${monthNames[calendarMonth]} ${calendarYear}</h3>
+        <button onClick=${() => {
+          if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(calendarYear + 1); }
+          else { setCalendarMonth(calendarMonth + 1); }
+        }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all"><${ArrowRightIcon} size=${16}/></button>
+      </div>
+      
+      <div className="grid grid-cols-7 gap-2 text-center mb-2">
+        ${['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map(d => html`<div key=${d} className="text-[10px] font-black text-slate-500 uppercase">${d}</div>`)}
+      </div>
+      
+      <div className="grid grid-cols-7 gap-2">
+        ${days.map((day, idx) => {
+          if (!day) return html`<div key=${'empty-'+idx} className="aspect-square"/>`;
+          const dateStr = `${calendarYear}-${String(calendarMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          const hasEntries = allLogs[dateStr] && allLogs[dateStr].items && allLogs[dateStr].items.length > 0;
+          const isSelected = selectedDate === dateStr;
+          const isToday = dateStr === getLocalToday();
+          
+          let baseClass = "relative aspect-square flex flex-col items-center justify-center rounded-2xl text-sm active:scale-90 transition-all border ";
+          
+          if (isSelected) {
+            baseClass += "bg-brand-500 text-slate-950 font-black border-brand-500 shadow-[0_0_15px_rgba(139,92,246,0.5)]";
+          } else if (hasEntries) {
+            baseClass += "bg-brand-500/20 text-brand-400 font-bold border-brand-500/30";
+          } else {
+            baseClass += "bg-slate-900/50 text-slate-400 font-bold border-white/5";
+          }
+          
+          return html`
+            <button key=${dateStr} onClick=${() => {
+              setSelectedDate(dateStr);
+              setShowCalendarModal(false);
+            }} className=${baseClass}>
+              ${day}
+              ${isToday && !isSelected ? html`<div className="w-1 h-1 bg-white rounded-full mt-0.5 absolute bottom-1.5"/>` : ''}
+            </button>
+          `;
+        })}
+      </div>
+    </div>
+  `;
+})()}
+
+${showAiCoach && html`
+  <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => !isAiCoachLoading && setShowAiCoach(false)}/>
+  <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10">
+    <div className="flex justify-between items-center">
+      <h3 className="text-xl font-black flex items-center gap-3"><${SparklesIcon} className="text-brand-400"/> Ernährungs-Coach</h3>
+      <button onClick=${() => !isAiCoachLoading && setShowAiCoach(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
+    </div>
+    
+    ${!aiCoachResult && !isAiCoachLoading && html`
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Von</label>
+            <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-white outline-none"/>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Bis</label>
+            <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-white outline-none"/>
+          </div>
+        </div>
+        <button onClick=${runAiCoach} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all">Analyse starten</button>
+      </div>
+    `}
+    
+    ${isAiCoachLoading && html`
+      <div className="py-12 flex flex-col items-center justify-center space-y-4">
+        <${LoaderIcon} size=${40} className="text-brand-500"/>
+        <p className="text-sm font-bold text-slate-400 animate-pulse">Analysiere Ernährung...</p>
+      </div>
+    `}
+    
+    ${aiCoachResult && html`
+      <div className="space-y-6 animate-in zoom-in duration-500">
+        <div className="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-[2rem] border border-white/5 relative overflow-hidden">
+          <div className="absolute inset-0 bg-brand-500/10 blur-xl"/>
+          <div className="relative text-5xl font-black text-white mb-2" style=${{ color: aiCoachResult.score >= 80 ? '#10b981' : aiCoachResult.score >= 50 ? '#f59e0b' : '#ef4444' }}>
+            ${aiCoachResult.score}<span className="text-lg opacity-50">/100</span>
+          </div>
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">${aiCoachResult.verdict}</div>
+        </div>
+        
+        <div className="grid gap-4">
+          <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-2">
+            <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><${CheckIcon} size=${14}/> Das war top</h4>
+            <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-emerald-500/50">
+              ${aiCoachResult.good.map(g => html`<li key=${g}>${g}</li>`)}
+            </ul>
+          </div>
+          
+          <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2">
+            <h4 className="text-xs font-black text-rose-400 uppercase tracking-widest flex items-center gap-2"><${XIcon} size=${14}/> Das geht besser</h4>
+            <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-rose-500/50">
+              ${aiCoachResult.bad.map(b => html`<li key=${b}>${b}</li>`)}
+            </ul>
+          </div>
+          
+          <div className="p-5 bg-brand-500/10 border border-brand-500/20 rounded-2xl space-y-2">
+            <h4 className="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-2">💡 Tipps für dich</h4>
+            <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-brand-500/50">
+              ${aiCoachResult.tips.map(t => html`<li key=${t}>${t}</li>`)}
+            </ul>
+          </div>
+        </div>
+        <button onClick=${() => setAiCoachResult(null)} className="w-full py-4 text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-800 rounded-2xl active:scale-95 transition-all">Neue Analyse</button>
+      </div>
+    `}
+  </div>
+`}
+
+</div>`;
 }
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(html`<${App}/>`);
