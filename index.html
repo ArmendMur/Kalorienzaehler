@@ -186,7 +186,7 @@ const ProgressRing = React.memo(({
   }} strokeLinecap="round" fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/>${isExceeded && html`<circle stroke="#ef4444" strokeWidth=${12} strokeDasharray=${circ} style=${{
     strokeDashoffset: excessOffset,
     transition: 'stroke-dashoffset 0.8s'
-  }} strokeLinecap="round" fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/>`}</svg><div className="absolute text-center"><div className="text-3xl font-black text-white tracking-tighter"><${AnimatedNumber} value=${Math.round(consumed)} /></div><div className=${`text-[9px] font-black uppercase tracking-widest ${diff < 0 ? 'text-rose-500' : 'text-slate-500'}`}>${diff < 0 ? `${Math.abs(Math.round(diff))} kcal drüber` : `${Math.round(diff)} kcal übrig`}</div></div></div>`;
+  }} strokeLinecap="round" fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/>`}</svg><div className="absolute text-center"><div className=${`text-3xl font-black tracking-tighter ${isExceeded ? 'text-rose-500' : 'text-white'}`}><${AnimatedNumber} value=${Math.round(consumed)} /></div><div className=${`text-[9px] font-black uppercase tracking-widest ${diff < 0 ? 'text-rose-500' : 'text-slate-500'}`}>${diff < 0 ? `${Math.abs(Math.round(diff))} kcal drüber` : `${Math.round(diff)} kcal übrig`}</div></div></div>`;
 });
 const MacroBar = ({
   label,
@@ -199,7 +199,7 @@ const MacroBar = ({
   const mainPercent = Math.min(rawPercent, 100);
   const excessPercent = isExceeded ? Math.min(rawPercent - 100, 100) : 0;
   const textColorClass = color ? color.replace('bg-', 'text-') : 'text-white';
-  return html`<div className="space-y-1.5"><div className="flex justify-between items-end px-1"><span className=${`text-[9px] font-black uppercase tracking-wider ${textColorClass}`}>${label}</span><span className=${`text-[10px] font-black ${textColorClass}`}>${Math.round(value)}g <span className="font-bold text-slate-400">/ ${target}g</span></span></div><div className="h-1.5 w-full bg-slate-800/50 rounded-full overflow-hidden relative"><div className=${`h-full ${color} rounded-full transition-all duration-1000 absolute top-0 left-0`} style=${{
+  return html`<div className="space-y-1.5"><div className="flex justify-between items-end px-1"><span className=${`text-[9px] font-black uppercase tracking-wider ${textColorClass}`}>${label}</span><span className=${`text-[10px] font-black ${textColorClass}`}>${Math.round(value)}g <span className="font-bold">/ ${target}g</span></span></div><div className="h-1.5 w-full bg-slate-800/50 rounded-full overflow-hidden relative"><div className=${`h-full ${color} rounded-full transition-all duration-1000 absolute top-0 left-0`} style=${{
     width: `${mainPercent}%`
   }}/>${isExceeded && html`<div className="h-full bg-rose-500 rounded-full transition-all duration-1000 absolute top-0 left-0" style=${{
     width: `${excessPercent}%`
