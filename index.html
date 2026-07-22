@@ -127,8 +127,10 @@ const resizeImage = file => {
 
 const getSugarColor = (val) => {
   const v = Number(val) || 0;
-  if (v < 50) return 'text-sky-300';
-  return 'text-rose-500 font-black';
+  if (v < 25) return 'text-sky-300';
+  if (v < 35) return 'text-amber-300';
+  if (v < 50) return 'text-orange-400';
+  return 'text-rose-500 font-black animate-[pulse_1s_ease-in-out_3]';
 };
 
 // --- COMPONENTS ---
@@ -196,7 +198,8 @@ const MacroBar = ({
   const isExceeded = rawPercent > 100;
   const mainPercent = Math.min(rawPercent, 100);
   const excessPercent = isExceeded ? Math.min(rawPercent - 100, 100) : 0;
-  return html`<div className="space-y-1.5"><div className="flex justify-between items-end px-1"><span className="text-[9px] font-black uppercase tracking-wider text-white">${label}</span><span className="text-[10px] font-bold text-white">${Math.round(value)}g <span>/ ${target}g</span></span></div><div className="h-1.5 w-full bg-slate-800/50 rounded-full overflow-hidden relative"><div className=${`h-full ${color} rounded-full transition-all duration-1000 absolute top-0 left-0`} style=${{
+  const textColorClass = color ? color.replace('bg-', 'text-') : 'text-white';
+  return html`<div className="space-y-1.5"><div className="flex justify-between items-end px-1"><span className=${`text-[9px] font-black uppercase tracking-wider ${textColorClass}`}>${label}</span><span className=${`text-[10px] font-black ${textColorClass}`}>${Math.round(value)}g <span className="font-bold text-slate-400">/ ${target}g</span></span></div><div className="h-1.5 w-full bg-slate-800/50 rounded-full overflow-hidden relative"><div className=${`h-full ${color} rounded-full transition-all duration-1000 absolute top-0 left-0`} style=${{
     width: `${mainPercent}%`
   }}/>${isExceeded && html`<div className="h-full bg-rose-500 rounded-full transition-all duration-1000 absolute top-0 left-0" style=${{
     width: `${excessPercent}%`
