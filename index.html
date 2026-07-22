@@ -203,7 +203,7 @@ const SubMacroRow = ({
   color,
   valuePrefix,
   valueSuffix
-}) => html`<div className="flex justify-between items-center px-1"><span className=${`text-[8px] font-black uppercase tracking-wider ${color}`}>${label}</span><span className=${`text-[10px] font-bold flex items-center gap-1 ${color}`}>${valuePrefix && html`<span>${valuePrefix}</span>`}${Math.round(value)}g${valueSuffix && html`<span className="animate-[pulse_1s_ease-in-out_3]">${valueSuffix}</span>`}</span></div>`;
+}) => html`<div className="flex justify-between items-center px-1"><span className=${`text-[8px] font-black uppercase tracking-wider ${color}`}>${label}</span><span className=${`text-[10px] font-bold flex items-center ${color}`}>${valuePrefix && html`<span className="mr-1">${valuePrefix}</span>`}${Math.round(value)}g${valueSuffix && html`<span className="inline-block animate-[pulse_1s_ease-in-out_3] ml-1">${valueSuffix}</span>`}</span></div>`;
 const GoalInput = ({
   label,
   value,
