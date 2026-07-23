@@ -891,6 +891,7 @@ ${!selectedFood ? null : (() => {
 
   </div></div><button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-3 rounded-[2rem] text-base font-bold uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button></div></div>`;
 })()}
+${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex items-center justify-between whitespace-nowrap mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
   <button onClick=${() => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() - 1);
