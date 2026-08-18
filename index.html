@@ -1080,22 +1080,37 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       setAiImage(base64);
       setShowAiModal(true);
     }
-  }}/></div>${!searchQuery && apiResults.length === 0 && html`<div className="space-y-4"><div className="flex gap-2 p-1 bg-slate-900 rounded-2xl border border-white/5 mx-1"><button onClick=${() => setActiveTab('frequent')} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'frequent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>⭐ Häufig</button><button onClick=${() => setActiveTab('recent')} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'recent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>🕒 Zuletzt</button></div><div className="space-y-3">${(activeTab === 'frequent' ? frequentItems : recentItems).map(item => {
-    const portionWeight = item.lastAmount || 100;
-    const portionCalories = Math.round((Number(item.baseCalories ?? item.calories ?? 0)) * (portionWeight / 100));
-    return html`<div key=${item.name} className="relative overflow-hidden rounded-[1.5rem]" onTouchStart=${e => touchStart.current = e.touches[0].clientX} onTouchEnd=${e => {
-    const delta = touchStart.current - e.changedTouches[0].clientX;
-    if (delta > 80) setSwipeId(item.name);
-    if (delta < -80) setSwipeId(null);
-  }}><div onClick=${() => {
-    setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => i.name !== item.name));
-    setSwipeId(null);
-  }} className="absolute inset-y-0 right-0 w-24 bg-slate-800/80 flex items-center justify-center text-rose-400 font-black uppercase text-[9px] tracking-widest border-l border-white/5"><${TrashIcon} size=${14} className="mr-1"/> Löschen</div><div onClick=${() => selectFood(item)} className=${`glass-card p-4 flex justify-between items-center active:scale-[0.98] transition-transform duration-300 relative z-10 cursor-pointer ${swipeId === item.name ? '-translate-x-24' : ''}`}><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">${getItemDisplay(item)}</div><div><div className="font-bold text-sm text-white">${item.name}</div><div className="text-[10px] font-black text-slate-500 uppercase">${portionWeight}g | ${portionCalories} kcal</div></div></div><${PlusIcon} size=${16} className="text-brand-400"/></div></div>`;
-  })}</div></div>`<div className="space-y-3 mt-4">${apiResults.map(f => {
-    const portionWeight = f.lastAmount || 100;
-    const portionCalories = Math.round((Number(f.baseCalories ?? f.calories ?? 0)) * (portionWeight / 100));
-    return html`<div key=${f.id} onClick=${() => selectFood(f)} className="glass-card p-4 rounded-[2rem] flex justify-between items-center animate-in zoom-in cursor-pointer active:scale-98"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center text-xl border border-white/5 shadow-inner">${getItemDisplay(f)}</div><div><div className="font-bold text-white">${f.name}</div><div className="text-[10px] font-black text-slate-500 uppercase">${portionWeight}g | ${portionCalories} kcal</div></div></div><div className="p-2 bg-brand-500 text-slate-950 rounded-xl shadow-lg"><${PlusIcon} size=${20}/></div></div>`;
-  })}</div></div>`}${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => {
+  }}/></div>
+  ${!searchQuery && apiResults.length === 0 && html`<div className="space-y-4">
+    <div className="flex gap-2 p-1 bg-slate-900 rounded-2xl border border-white/5 mx-1">
+      <button onClick=${() => setActiveTab('frequent')} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'frequent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>⭐ Häufig</button>
+      <button onClick=${() => setActiveTab('recent')} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'recent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>🕒 Zuletzt</button>
+    </div>
+    <div className="space-y-3">
+      ${(activeTab === 'frequent' ? frequentItems : recentItems).map(item => {
+        const portionWeight = item.lastAmount || 100;
+        const portionCalories = Math.round((Number(item.baseCalories ?? item.calories ?? 0)) * (portionWeight / 100));
+        return html`<div key=${item.name} className="relative overflow-hidden rounded-[1.5rem]" onTouchStart=${e => touchStart.current = e.touches[0].clientX} onTouchEnd=${e => {
+          const delta = touchStart.current - e.changedTouches[0].clientX;
+          if (delta > 80) setSwipeId(item.name);
+          if (delta < -80) setSwipeId(null);
+        }}><div onClick=${() => {
+          setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => i.name !== item.name));
+          setSwipeId(null);
+        }} className="absolute inset-y-0 right-0 w-24 bg-slate-800/80 flex items-center justify-center text-rose-400 font-black uppercase text-[9px] tracking-widest border-l border-white/5"><${TrashIcon} size=${14} className="mr-1"/> Löschen</div><div onClick=${() => selectFood(item)} className=${`glass-card p-4 flex justify-between items-center active:scale-[0.98] transition-transform duration-300 relative z-10 cursor-pointer ${swipeId === item.name ? '-translate-x-24' : ''}`}><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">${getItemDisplay(item)}</div><div><div className="font-bold text-sm text-white">${item.name}</div><div className="text-[10px] font-black text-slate-500 uppercase">${portionWeight}g | ${portionCalories} kcal</div></div></div><${PlusIcon} size=${16} className="text-brand-400"/></div></div>`;
+      })}
+    </div>
+  </div>`}
+  ${apiResults.length > 0 && html`<div className="space-y-3 mt-4">
+    ${apiResults.map(f => {
+      const portionWeight = f.lastAmount || 100;
+      const portionCalories = Math.round((Number(f.baseCalories ?? f.calories ?? 0)) * (portionWeight / 100));
+      return html`<div key=${f.id} onClick=${() => selectFood(f)} className="glass-card p-4 rounded-[2rem] flex justify-between items-center animate-in zoom-in cursor-pointer active:scale-98"><div className="flex items-center gap-4"><div className="w-12 h-12 rounded-xl bg-slate-800/50 flex items-center justify-center text-xl border border-white/5 shadow-inner">${getItemDisplay(f)}</div><div><div className="font-bold text-white">${f.name}</div><div className="text-[10px] font-black text-slate-500 uppercase">${portionWeight}g | ${portionCalories} kcal</div></div></div><div className="p-2 bg-brand-500 text-slate-950 rounded-xl shadow-lg"><${PlusIcon} size=${20}/></div></div>`;
+    })}
+  </div>`}
+</div>`}
+
+${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => {
     setShowAiModal(false);
     setAiImage(null);
   }}/><div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10"><div className="flex justify-between items-center"><h3 className="text-xl font-black flex items-center gap-3"><${CameraIcon} className="text-brand-400"/> Foto-Info</h3><button type="button" onClick=${() => {
@@ -1284,70 +1299,71 @@ ${showCalendarModal && (() => {
 
 ${showAiCoach && html`
   <div className="fixed inset-0 bg-slate-950/95 z-[400] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => !isAiCoachLoading && setShowAiCoach(false)}>
-  <div className="w-full max-w-md glass-card rounded-[2.5rem] p-6 space-y-5 animate-in zoom-in duration-200 overflow-y-auto max-h-[85vh]" onClick=${e => e.stopPropagation()}>
-    <div className="flex justify-between items-center">
-      <h3 className="text-xl font-black flex items-center gap-3"><${SparklesIcon} className="text-brand-400"/> Ernährungs-Coach</h3>
-      <button onClick=${() => !isAiCoachLoading && setShowAiCoach(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
+    <div className="w-full max-w-md glass-card rounded-[2.5rem] p-6 space-y-5 animate-in zoom-in duration-200 overflow-y-auto max-h-[85vh]" onClick=${e => e.stopPropagation()}>
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-black flex items-center gap-3"><${SparklesIcon} className="text-brand-400"/> Ernährungs-Coach</h3>
+        <button onClick=${() => !isAiCoachLoading && setShowAiCoach(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
+      </div>
+      
+      ${!aiCoachResult && !isAiCoachLoading && html`
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase">Von</label>
+              <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-white outline-none"/>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-500 uppercase">Bis</label>
+              <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-white outline-none"/>
+            </div>
+          </div>
+          <button onClick=${runAiCoach} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all">Analyse starten</button>
+        </div>
+      `}
+      
+      ${isAiCoachLoading && html`
+        <div className="py-12 flex flex-col items-center justify-center space-y-4">
+          <${LoaderIcon} size=${40} className="text-brand-500"/>
+          <p className="text-sm font-bold text-slate-400 animate-pulse">Analysiere Ernährung...</p>
+        </div>
+      `}
+      
+      ${aiCoachResult && html`
+        <div className="space-y-6 animate-in zoom-in duration-500">
+          <div className="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-[2rem] border border-white/5 relative overflow-hidden">
+            <div className="absolute inset-0 bg-brand-500/10 blur-xl"/>
+            <div className="relative text-5xl font-black text-white mb-2" style=${{ color: (aiCoachResult.score || 0) >= 80 ? '#10b981' : (aiCoachResult.score || 0) >= 50 ? '#f59e0b' : '#ef4444' }}>
+              ${aiCoachResult.score ?? 0}<span className="text-lg opacity-50">/100</span>
+            </div>
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">${aiCoachResult.verdict || "Analyse abgeschlossen"}</div>
+          </div>
+          
+          <div className="grid gap-4">
+            <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-2">
+              <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><${CheckIcon} size=${14}/> Das war top</h4>
+              <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-emerald-500/50">
+                ${(Array.isArray(aiCoachResult.good) ? aiCoachResult.good : []).map(g => html`<li key=${g}>${g}</li>`)}
+              </ul>
+            </div>
+            
+            <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2">
+              <h4 className="text-xs font-black text-rose-400 uppercase tracking-widest flex items-center gap-2"><${XIcon} size=${14}/> Das geht besser</h4>
+              <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-rose-500/50">
+                ${(Array.isArray(aiCoachResult.bad) ? aiCoachResult.bad : []).map(b => html`<li key=${b}>${b}</li>`)}
+              </ul>
+            </div>
+            
+            <div className="p-5 bg-brand-500/10 border border-brand-500/20 rounded-2xl space-y-2">
+              <h4 className="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-2">💡 Tipps für dich</h4>
+              <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-brand-500/50">
+                ${(Array.isArray(aiCoachResult.tips) ? aiCoachResult.tips : []).map(t => html`<li key=${t}>${t}</li>`)}
+              </ul>
+            </div>
+          </div>
+          <button onClick=${() => setAiCoachResult(null)} className="w-full py-4 text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-800 rounded-2xl active:scale-95 transition-all">Neue Analyse</button>
+        </div>
+      `}
     </div>
-    
-    ${!aiCoachResult && !isAiCoachLoading && html`
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase">Von</label>
-            <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-white outline-none"/>
-          </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-500 uppercase">Bis</label>
-            <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="w-full p-4 bg-slate-900 border border-white/5 rounded-2xl text-white outline-none"/>
-          </div>
-        </div>
-        <button onClick=${runAiCoach} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all">Analyse starten</button>
-      </div>
-    `}
-    
-    ${isAiCoachLoading && html`
-      <div className="py-12 flex flex-col items-center justify-center space-y-4">
-        <${LoaderIcon} size=${40} className="text-brand-500"/>
-        <p className="text-sm font-bold text-slate-400 animate-pulse">Analysiere Ernährung...</p>
-      </div>
-    `}
-    
-    ${aiCoachResult && html`
-      <div className="space-y-6 animate-in zoom-in duration-500">
-        <div className="flex flex-col items-center justify-center p-6 bg-slate-900/50 rounded-[2rem] border border-white/5 relative overflow-hidden">
-          <div className="absolute inset-0 bg-brand-500/10 blur-xl"/>
-          <div className="relative text-5xl font-black text-white mb-2" style=${{ color: aiCoachResult.score >= 80 ? '#10b981' : aiCoachResult.score >= 50 ? '#f59e0b' : '#ef4444' }}>
-            ${aiCoachResult.score}<span className="text-lg opacity-50">/100</span>
-          </div>
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">${aiCoachResult.verdict}</div>
-        </div>
-        
-        <div className="grid gap-4">
-          <div className="p-5 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl space-y-2">
-            <h4 className="text-xs font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><${CheckIcon} size=${14}/> Das war top</h4>
-            <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-emerald-500/50">
-              ${aiCoachResult.good.map(g => html`<li key=${g}>${g}</li>`)}
-            </ul>
-          </div>
-          
-          <div className="p-5 bg-rose-500/10 border border-rose-500/20 rounded-2xl space-y-2">
-            <h4 className="text-xs font-black text-rose-400 uppercase tracking-widest flex items-center gap-2"><${XIcon} size=${14}/> Das geht besser</h4>
-            <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-rose-500/50">
-              ${aiCoachResult.bad.map(b => html`<li key=${b}>${b}</li>`)}
-            </ul>
-          </div>
-          
-          <div className="p-5 bg-brand-500/10 border border-brand-500/20 rounded-2xl space-y-2">
-            <h4 className="text-xs font-black text-brand-400 uppercase tracking-widest flex items-center gap-2">💡 Tipps für dich</h4>
-            <ul className="text-sm text-slate-300 space-y-1 list-disc pl-4 marker:text-brand-500/50">
-              ${aiCoachResult.tips.map(t => html`<li key=${t}>${t}</li>`)}
-            </ul>
-          </div>
-        </div>
-        <button onClick=${() => setAiCoachResult(null)} className="w-full py-4 text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-800 rounded-2xl active:scale-95 transition-all">Neue Analyse</button>
-      </div>
-    `}
   </div>
 `}
 
