@@ -1306,18 +1306,18 @@ ${showAiCoach && html`
       </div>
       
       ${!aiCoachResult && !isAiCoachLoading && html`
-        <div className="space-y-4">
-          <div className="flex items-center gap-4 w-full">
-            <div className="flex-1 space-y-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Von</label>
-              <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="w-full h-10 px-2 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-1 focus:ring-brand-400/50"/>
+        <div className="space-y-6">
+          <div className="flex items-center justify-center gap-5 w-full my-2">
+            <div className="w-36 shrink-0 space-y-1.5 text-center">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Von</label>
+              <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="w-full py-2.5 px-2 bg-slate-900 border border-white/15 rounded-2xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-2 focus:ring-brand-500/50 block"/>
             </div>
-            <div className="flex-1 space-y-1">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">Bis</label>
-              <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="w-full h-10 px-2 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-1 focus:ring-brand-400/50"/>
+            <div className="w-36 shrink-0 space-y-1.5 text-center">
+              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Bis</label>
+              <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="w-full py-2.5 px-2 bg-slate-900 border border-white/15 rounded-2xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-2 focus:ring-brand-500/50 block"/>
             </div>
           </div>
-          <button onClick=${runAiCoach} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all">Analyse starten</button>
+          <button onClick=${runAiCoach} className="w-full py-5 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl">Analyse starten</button>
         </div>
       `}
       
