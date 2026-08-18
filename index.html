@@ -818,13 +818,13 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setAmount(100);
   }, [amount, editingInstanceId, setDailyLog, setItemHistory]);
   return html`<div className="max-w-md mx-auto min-h-screen bg-slate-950 text-slate-100 px-6 pb-24 pt-[env(safe-area-inset-top,2.5rem)] relative overflow-hidden">
-    ${showSuccess && html`<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[300] bg-brand-500 text-slate-950 px-8 py-4 rounded-full font-black flex items-center gap-3 shadow-2xl animate-success-fade"><\${CheckIcon} size=\${24}/> Gespeichert!</div>`}
+    ${showSuccess && html`<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[300] bg-brand-500 text-slate-950 px-8 py-4 rounded-full font-black flex items-center gap-3 shadow-2xl animate-success-fade"><${CheckIcon} size=${24}/> Gespeichert!</div>`}
     ${showDetails && html`<div className="fixed inset-0 bg-slate-950/95 z-[200] flex items-center justify-center p-6 backdrop-blur-xl animate-in zoom-in duration-200">
       <div className="w-full glass-card rounded-[3rem] p-5 sm:p-6 space-y-6 overscroll-contain">
         <div>
           <div className="flex justify-between items-center mb-4">
             <div className="text-4xl">${showDetails?.emoji || "🍽️"}</div>
-            <button onClick=${() => setShowDetails(null)} className="p-2 bg-slate-800 rounded-full"><\${XIcon} size=\${20}/></button>
+            <button onClick=${() => setShowDetails(null)} className="p-2 bg-slate-800 rounded-full"><${XIcon} size=${20}/></button>
           </div>
           <div><h3 className="w-full text-2xl font-black text-white break-words leading-tight mb-1">${showDetails?.name || "Unbenannt"}</h3></div>
         </div>
@@ -920,16 +920,16 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         <button type="button" onClick=${() => {
           setSelectedFood(null);
           setEditingInstanceId(null);
-        }} className="p-2 bg-slate-800 rounded-full active:opacity-80 shrink-0"><\${XIcon} size=\${20}/></button>
+        }} className="p-2 bg-slate-800 rounded-full active:opacity-80 shrink-0"><${XIcon} size=${20}/></button>
       </div>
       <div className="space-y-6 mb-8">
         <div className="flex items-center gap-4">
-          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-5 bg-slate-800 rounded-2xl active:opacity-80 touch-manipulation"><\${MinusIcon} size=\${20}/></button>
+          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-5 bg-slate-800 rounded-2xl active:opacity-80 touch-manipulation"><${MinusIcon} size=${20}/></button>
           <div className="flex-1 relative">
             <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="w-full p-5 bg-slate-900 rounded-[1.5rem] text-3xl font-black text-center outline-none focus:ring-2 focus:ring-brand-500 text-white"/>
             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 font-black pointer-events-none">g</span>
           </div>
-          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount((amount || 0) + 50); }} className="p-5 bg-brand-500 text-slate-950 rounded-2xl active:opacity-80 touch-manipulation"><\${PlusIcon} size=\${20}/></button>
+          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount((amount || 0) + 50); }} className="p-5 bg-brand-500 text-slate-950 rounded-2xl active:opacity-80 touch-manipulation"><${PlusIcon} size=${20}/></button>
         </div>
         <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
           <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
@@ -1020,7 +1020,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 </div>
         </div>
       </div>
-      <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<\${LoaderIcon} size=\${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
+      <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
     </div>`}
     ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
   <button onClick=${() => {
