@@ -420,7 +420,7 @@ Daten: Alter: ${aiGoalForm.age}, Geschlecht: ${aiGoalForm.gender}, Größe: ${ai
 Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 {"target": int, "targetP": int, "targetC": int, "targetF": int}`;
       
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${user.geminiApiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -484,7 +484,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         items: d.items.map(i => ({ name: i.name, cal: i.calories, p: i.protein, c: i.carbs, f: i.fat }))
       })))}`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key=${user.geminiApiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -922,12 +922,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       </div>
       <div className="space-y-6 mb-8">
         <div className="flex items-center gap-4">
-          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-5 bg-slate-800 rounded-2xl active:opacity-80 touch-manipulation"><${MinusIcon} size=${20}/></button>
-          <div className="flex-1 relative">
-            <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="w-full p-5 bg-slate-900 rounded-[1.5rem] text-3xl font-black text-center outline-none focus:ring-2 focus:ring-brand-500 text-white"/>
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-600 font-black pointer-events-none">g</span>
+          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-95 transition-all text-white touch-manipulation"><${MinusIcon} size=${20}/></button>
+          <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-2xl p-3 flex items-center justify-center gap-2 focus-within:ring-1 focus-within:ring-brand-400/60 transition-all flex-1">
+            <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center text-2xl font-black text-white outline-none w-full max-w-[120px]"/>
+            <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
           </div>
-          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount((amount || 0) + 50); }} className="p-5 bg-brand-500 text-slate-950 rounded-2xl active:opacity-80 touch-manipulation"><${PlusIcon} size=${20}/></button>
+          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount((amount || 0) + 50); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-95 transition-all touch-manipulation"><${PlusIcon} size=${20}/></button>
         </div>
         <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
           <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
@@ -1098,7 +1098,6 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setAiImage(null);
   }} className="w-full py-2 text-slate-500 font-bold text-xs uppercase tracking-widest">Abbrechen</button></div></div>`}${view === 'profile' && html`<div className="animate-in slide-in-from-right duration-300"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => setView('dashboard')} className="p-4 glass-card rounded-2xl active:scale-90"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Ziele</h2></div><div className="glass-card p-8 rounded-[3rem] space-y-6 shadow-2xl border border-white/10 overflow-y-auto max-h-[75vh]">
   
-  <div className="p-4 bg-slate-900/60 rounded-2xl border border-white/5 space-y-3 mb-8">
     <h3 className="text-sm font-black text-white flex items-center gap-2"><span className="text-lg">🤖</span> KI-Ziele-Assistent</h3>
     <div className="grid grid-cols-2 gap-3">
       <div className="space-y-1">
@@ -1140,13 +1139,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     <button onClick=${calculateGoalsViaAi} className="w-full py-4 bg-brand-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
       ${isAiGoalLoading ? html`<${LoaderIcon} size=${16}/>` : html`<${SparklesIcon} size=${16}/> Ziele via KI berechnen`}
     </button>
-  </div>
 
   <div className="border-b border-white/10 my-6"></div>
 
   <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1 mb-3">🎯 Nährwerte</h4>
   <div className="space-y-3">
-    <${GoalInput} label="Energie (kcal)" value=${user.target} color="text-brand-400" onChange=${v => setUser({
+    <${GoalInput} label="🔥 Energie (kcal)" value=${user.target} color="text-brand-400" onChange=${v => setUser({
       ...user,
       target: v
     })}/>
