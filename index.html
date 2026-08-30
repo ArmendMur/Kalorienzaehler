@@ -109,9 +109,7 @@ const ArrowLeftIcon = p => html`<${Icon} d="m12 19-7-7 7-7M19 12H5" ...${p}/>`;
 const ArrowRightIcon = p => html`<${Icon} d="m12 5 7 7-7 7M5 12h14" ...${p}/>`;
 const CheckIcon = p => html`<${Icon} d="m20 6-11 11-5-5" ...${p}/>`;
 const LoaderIcon = p => html`<${Icon} d="M21 12a9 9 0 1 1-6.219-8.56" ...${p} className="spinner"/>`;
-const MicIcon = p => html`<${Icon} d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3ZM19 10v2a7 7 0 0 1-14 0v-2M12 19v3M8 22h8" ...${p}/>`;
 const FlashlightIcon = p => html`<${Icon} d="M18 6c0 2-2 4-2 6v4a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-4c0-2-2-4-2-6V2h12v4ZM10 2v4M14 2v4M12 12v2" ...${p}/>`;
-const ScaleIcon = p => html`<${Icon} d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM7 21h10M12 3v18M3 7h18" ...${p}/>`;
 const BookIcon = p => html`<${Icon} d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5ZM6 6h10M6 10h10" ...${p}/>`;
 
 // --- HELPERS ---
@@ -121,6 +119,37 @@ const getItemDisplay = (item, isLarge = false) => {
   if (item.image) return html`<img src=${item.image} alt=${item.name} loading="lazy" className=${`w-full h-full object-cover ${isLarge ? 'rounded-2xl' : 'rounded-xl'}`}/>`;
   return html`<div className=${`flex items-center justify-center w-full h-full ${isLarge ? 'text-3xl' : 'text-xl'}`}>🍽️</div>`;
 };
+
+const getSmartFoodUnit = (food) => {
+  if (!food) return null;
+  if (food.unitName && food.pieceWeight) {
+    return { unitName: food.unitName, pieceWeight: Number(food.pieceWeight) };
+  }
+  const name = (food.name || '').toLowerCase();
+  
+  if (/\b(ei|eier|rührei|spiegelei|gekochtes ei|gekochte eier)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 55 };
+  if (/\b(nugget|nuggets)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 20 };
+  if (/\b(banane|bananen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
+  if (/\b(apfel|äpfel)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 150 };
+  if (/\b(birne|birnen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 160 };
+  if (/\b(orange|orangen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 180 };
+  if (/\b(toast|toastbrot)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 30 };
+  if (/\b(brot|brotscheibe|graubrot|vollkornbrot)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 45 };
+  if (/\b(brötchen|semmel|schrippe)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
+  if (/\b(riegel|proteinriegel|müsliriegel|corny)\b/i.test(name)) return { unitName: 'Riegel', pieceWeight: 45 };
+  if (/\b(keks|kekse|cookie|cookies)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 25 };
+  if (/\b(burger|cheeseburger|hamburger)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 200 };
+  if (/\b(dose|red bull|monster|cola)\b/i.test(name) && !/100/i.test(name)) return { unitName: 'Dose', pieceWeight: 330 };
+  if (/\b(flasche|wasser)\b/i.test(name) && !/100/i.test(name)) return { unitName: 'Flasche', pieceWeight: 500 };
+  if (/\b(avocado)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 160 };
+  if (/\b(becher|joghurtbecher)\b/i.test(name)) return { unitName: 'Becher', pieceWeight: 150 };
+  if (/\b(pizzastück|pizza)\b/i.test(name) && !/ganz/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
+  if (/\b(wiener|würstchen|bratwurst)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
+  if (food.estimatedPortionWeight) return { unitName: 'Portion', pieceWeight: Number(food.estimatedPortionWeight) };
+
+  return null;
+};
+
 const resizeImage = file => {
   return new Promise(resolve => {
     const reader = new FileReader();
@@ -215,18 +244,20 @@ const addDaysToDateStr = (dateStr, days) => {
   return formatLocalDate(d);
 };
 
-const SwipeableLogItem = ({ item, onSelect, onDelete }) => {
+const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
   const [translateX, setTranslateX] = useState(0);
-  const [isSwiping, setIsSwiping] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const startX = useRef(0);
   const startY = useRef(0);
   const isHorizontal = useRef(null);
+  const currentTranslate = useRef(0);
 
   const handleTouchStart = (e) => {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     isHorizontal.current = null;
-    setIsSwiping(false);
+    setIsDragging(false);
   };
 
   const handleTouchMove = (e) => {
@@ -234,83 +265,116 @@ const SwipeableLogItem = ({ item, onSelect, onDelete }) => {
     const diffY = e.touches[0].clientY - startY.current;
 
     if (isHorizontal.current === null) {
-      if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+      if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
         isHorizontal.current = Math.abs(diffX) > Math.abs(diffY);
       }
     }
 
     if (isHorizontal.current) {
       if (e.cancelable) e.preventDefault();
-      setIsSwiping(true);
+      setIsDragging(true);
       if (diffX < 0) {
-        setTranslateX(Math.max(diffX, -95));
+        const newX = diffX < -110 ? -110 + (diffX + 110) * 0.4 : diffX;
+        setTranslateX(newX);
+        currentTranslate.current = newX;
+        if (newX < -130 && !window._hapticTriggered) {
+          triggerHaptic('medium');
+          window._hapticTriggered = true;
+        }
       } else {
-        setTranslateX(0);
+        setTranslateX(diffX * 0.15);
+        currentTranslate.current = 0;
       }
     }
   };
 
   const handleTouchEnd = () => {
-    if (translateX < -55) {
-      setTranslateX(-80);
+    window._hapticTriggered = false;
+    setIsDragging(false);
+    if (currentTranslate.current < -140) {
+      triggerDelete();
+    } else if (currentTranslate.current < -50) {
+      setTranslateX(-84);
+      currentTranslate.current = -84;
       triggerHaptic('light');
     } else {
       setTranslateX(0);
+      currentTranslate.current = 0;
     }
-    setTimeout(() => setIsSwiping(false), 50);
   };
 
-  const handleDelete = (e) => {
-    e.stopPropagation();
+  const triggerDelete = () => {
     triggerHaptic('delete');
-    setTranslateX(-400);
+    setIsDeleting(true);
+    setTranslateX(-450);
     setTimeout(() => {
-      onDelete(item.instanceId);
-    }, 200);
+      if (onDelete) onDelete();
+    }, 220);
+  };
+
+  const handleClick = (e) => {
+    if (currentTranslate.current < -10) {
+      e.stopPropagation();
+      setTranslateX(0);
+      currentTranslate.current = 0;
+    } else if (!isDragging && onSelect) {
+      onSelect();
+    }
   };
 
   return html`
-    <div className="relative mb-3 rounded-[1.8rem] overflow-hidden select-none touch-pan-y">
-      <div className="absolute inset-y-0 right-0 w-24 bg-rose-600/90 rounded-[1.8rem] flex items-center justify-center text-white cursor-pointer active:bg-rose-700 transition-colors" onClick=${handleDelete}>
-        <div className="flex flex-col items-center gap-0.5">
-          <${TrashIcon} size=${20} />
+    <div className=${`relative mb-3 rounded-[1.8rem] overflow-hidden select-none touch-pan-y transition-all duration-300 ${isDeleting ? 'max-h-0 opacity-0 mb-0 pointer-events-none' : 'max-h-40 opacity-100'} ${className}`}>
+      <div 
+        className="absolute inset-y-0 right-0 w-full bg-gradient-to-l from-rose-600 via-rose-600 to-rose-700/80 rounded-[1.8rem] flex items-center justify-end px-6 cursor-pointer active:brightness-90 transition-colors"
+        onClick=${(e) => { e.stopPropagation(); triggerDelete(); }}
+      >
+        <div 
+          className="flex flex-col items-center gap-1 text-white transition-transform duration-150"
+          style=${{
+            transform: `scale(${Math.min(1.2, Math.max(0.8, Math.abs(translateX) / 80))})`,
+            opacity: Math.min(1, Math.abs(translateX) / 30)
+          }}
+        >
+          <${TrashIcon} size=${22} />
           <span className="text-[9px] font-black uppercase tracking-wider">Löschen</span>
         </div>
       </div>
+
       <div
         style=${{
           transform: `translateX(${translateX}px)`,
-          transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)'
+          transition: isDragging ? 'none' : 'transform 0.28s cubic-bezier(0.25, 1, 0.5, 1)'
         }}
         onTouchStart=${handleTouchStart}
         onTouchMove=${handleTouchMove}
         onTouchEnd=${handleTouchEnd}
-        onClick=${() => {
-          if (translateX < -10) {
-            setTranslateX(0);
-          } else if (!isSwiping) {
-            triggerHaptic('light');
-            onSelect(item);
-          }
-        }}
-        className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90"
+        onClick=${handleClick}
+        className="relative z-10"
       >
-        <div className="flex items-center gap-4 min-w-0 flex-1">
-          <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
-            ${getItemDisplay(item)}
-          </div>
-          <div className="flex-1 min-w-0 py-0.5">
-            <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-            <div className="text-[10px] font-black text-slate-500 uppercase truncate">${item.amountDisplay} | ${Math.round(item.calories)} kcal</div>
-          </div>
-        </div>
-        <div className="shrink-0 text-slate-600 pl-2">
-          <${ArrowLeftIcon} size=${14} className="opacity-40" />
-        </div>
+        ${children}
       </div>
     </div>
   `;
 };
+
+const SwipeableLogItem = ({ item, onSelect, onDelete }) => html`
+  <${SwipeableItem} onSelect=${() => onSelect(item)} onDelete=${() => onDelete(item.instanceId)}>
+    <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
+      <div className="flex items-center gap-4 min-w-0 flex-1">
+        <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
+          ${getItemDisplay(item)}
+        </div>
+        <div className="flex-1 min-w-0 py-0.5">
+          <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
+          <div className="text-[10px] font-black text-slate-500 uppercase truncate">${item.amountDisplay || `${item.amount || 100}g`} | ${Math.round(item.calories)} kcal</div>
+        </div>
+      </div>
+      <div className="shrink-0 text-slate-600 pl-2">
+        <${ArrowLeftIcon} size=${14} className="opacity-40" />
+      </div>
+    </div>
+  </${SwipeableItem}>
+`;
 
 const AnimatedNumber = ({ value }) => {
   const [display, setDisplay] = useState(value);
@@ -469,19 +533,23 @@ function App() {
     const saved = savedRaw && savedRaw !== "null" ? JSON.parse(savedRaw) : null;
     return Array.isArray(saved) ? saved : [];
   });
-  const [weightLogs, setWeightLogs] = useState(() => {
-    const saved = localStorage.getItem('kTrackWeightLogs');
-    return saved && saved !== "null" ? JSON.parse(saved) : [];
-  });
-  const [showWeightModal, setShowWeightModal] = useState(false);
-  const [newWeightInput, setNewWeightInput] = useState('');
 
   const [recipes, setRecipes] = useState(() => {
     const saved = localStorage.getItem('kTrackRecipes');
     return saved && saved !== "null" ? JSON.parse(saved) : [];
   });
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [recipeDraft, setRecipeDraft] = useState({
+    name: '',
+    emoji: '🥗',
+    servings: 1,
+    ingredients: []
+  });
+  const [draftIngSearch, setDraftIngSearch] = useState('');
+  const [draftIngGrams, setDraftIngGrams] = useState(100);
+  const [draftSelectedFood, setDraftSelectedFood] = useState(null);
+
   const [isTorchOn, setIsTorchOn] = useState(false);
-  const [isListening, setIsListening] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('kTrackUser', JSON.stringify(user));
@@ -489,9 +557,6 @@ function App() {
   useEffect(() => {
     localStorage.setItem('kTrackAiGoalForm', JSON.stringify(aiGoalForm));
   }, [aiGoalForm]);
-  useEffect(() => {
-    localStorage.setItem('kTrackWeightLogs', JSON.stringify(weightLogs));
-  }, [weightLogs]);
   useEffect(() => {
     localStorage.setItem('kTrackRecipes', JSON.stringify(recipes));
   }, [recipes]);
@@ -553,52 +618,6 @@ function App() {
     }
   };
 
-  const startVoiceInput = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      const input = prompt("Was hast du gegessen? (z.B. '2 Spiegeleier mit 1 Scheibe Brot')");
-      if (input) askGemini(input);
-      return;
-    }
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'de-DE';
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        triggerHaptic('medium');
-      };
-
-      recognition.onresult = (event) => {
-        const text = event.results[0][0].transcript;
-        setIsListening(false);
-        triggerHaptic('success');
-        if (text) {
-          askGemini(text);
-        }
-      };
-
-      recognition.onerror = (event) => {
-        setIsListening(false);
-        triggerHaptic('delete');
-        if (event.error !== 'no-speech') {
-          alert("Sprachaufnahme Fehler: " + event.error);
-        }
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.start();
-    } catch(err) {
-      setIsListening(false);
-      alert("Mikrofon konnte nicht geöffnet werden: " + err.message);
-    }
-  };
-
   const toggleTorch = async () => {
     try {
       const videoElement = document.querySelector('#qr-reader video');
@@ -620,51 +639,102 @@ function App() {
     }
   };
 
-  const saveDayAsRecipe = () => {
-    if (!dailyLog.items || dailyLog.items.length === 0) return alert("Heute sind keine Einträge vorhanden.");
-    const name = prompt("Name für dieses Rezept/Mahlzeit:", "Meine Mahlzeit");
-    if (!name || !name.trim()) return;
-    const combinedCalories = dailyLog.items.reduce((acc, i) => acc + (Number(i.calories) || 0), 0);
-    const combinedProtein = dailyLog.items.reduce((acc, i) => acc + (Number(i.protein) || 0), 0);
-    const combinedCarbs = dailyLog.items.reduce((acc, i) => acc + (Number(i.carbs) || 0), 0);
-    const combinedSugar = dailyLog.items.reduce((acc, i) => acc + (Number(i.sugar) || 0), 0);
-    const combinedFat = dailyLog.items.reduce((acc, i) => acc + (Number(i.fat) || 0), 0);
-    const combinedSaturated = dailyLog.items.reduce((acc, i) => acc + (Number(i.saturatedFat) || 0), 0);
-    const combinedUnsaturated = dailyLog.items.reduce((acc, i) => acc + (Number(i.unsaturatedFat) || 0), 0);
-
-    const recipe = {
+  const openNewRecipeModal = () => {
+    setRecipeDraft({
       id: generateId(),
-      name: name.trim(),
-      emoji: "🥗",
-      calories: Math.round(combinedCalories),
-      protein: Math.round(combinedProtein * 10) / 10,
-      carbs: Math.round(combinedCarbs * 10) / 10,
-      sugar: Math.round(combinedSugar * 10) / 10,
-      fat: Math.round(combinedFat * 10) / 10,
-      saturatedFat: Math.round(combinedSaturated * 10) / 10,
-      unsaturatedFat: Math.round(combinedUnsaturated * 10) / 10,
-      itemsCount: dailyLog.items.length
-    };
-    setRecipes(prev => [recipe, ...(Array.isArray(prev) ? prev : [])]);
-    triggerHaptic('success');
-    alert(`Rezept "${name.trim()}" gespeichert! Du findest es unter Tracken > Rezepte.`);
+      name: '',
+      emoji: '🥗',
+      servings: 1,
+      ingredients: []
+    });
+    setDraftIngSearch('');
+    setDraftIngGrams(100);
+    setDraftSelectedFood(null);
+    setShowRecipeModal(true);
   };
 
-  const logWeightEntry = (weightValue) => {
-    const num = Number(weightValue);
-    if (!num || num <= 0) return alert("Bitte ein gültiges Gewicht eingeben.");
-    const entry = {
+  const addIngredientToDraft = () => {
+    if (!draftSelectedFood) return alert("Bitte wähle eine Zutat aus.");
+    const g = Number(draftIngGrams) || 0;
+    if (g <= 0) return alert("Bitte eine gültige Grammzahl eingeben.");
+    const ing = {
       id: generateId(),
-      date: selectedDate,
-      weight: Math.round(num * 10) / 10,
-      timestamp: Date.now()
+      name: draftSelectedFood.name,
+      emoji: draftSelectedFood.emoji || '🍽️',
+      grams: g,
+      baseCalories: Number(draftSelectedFood.baseCalories ?? draftSelectedFood.calories ?? 0),
+      baseProtein: Number(draftSelectedFood.baseProtein ?? draftSelectedFood.protein ?? 0),
+      baseCarbs: Number(draftSelectedFood.baseCarbs ?? draftSelectedFood.carbs ?? 0),
+      baseSugar: Number(draftSelectedFood.baseSugar ?? draftSelectedFood.sugar ?? 0),
+      baseFat: Number(draftSelectedFood.baseFat ?? draftSelectedFood.fat ?? 0),
+      baseSaturatedFat: Number(draftSelectedFood.baseSaturatedFat ?? draftSelectedFood.saturatedFat ?? 0),
+      baseUnsaturatedFat: Number(draftSelectedFood.baseUnsaturatedFat ?? draftSelectedFood.unsaturatedFat ?? 0)
     };
-    setWeightLogs(prev => {
-      const safe = Array.isArray(prev) ? prev : [];
-      const filtered = safe.filter(w => w.date !== selectedDate);
-      return [...filtered, entry].sort((a, b) => new Date(a.date) - new Date(b.date));
-    });
-    setNewWeightInput('');
+    setRecipeDraft(prev => ({
+      ...prev,
+      ingredients: [...prev.ingredients, ing]
+    }));
+    setDraftSelectedFood(null);
+    setDraftIngSearch('');
+    setDraftIngGrams(100);
+    triggerHaptic('success');
+  };
+
+  const removeIngredientFromDraft = (ingId) => {
+    triggerHaptic('delete');
+    setRecipeDraft(prev => ({
+      ...prev,
+      ingredients: prev.ingredients.filter(i => i.id !== ingId)
+    }));
+  };
+
+  const saveRecipeDraft = () => {
+    if (!recipeDraft.name || !recipeDraft.name.trim()) return alert("Bitte gib dem Rezept einen Namen.");
+    if (!recipeDraft.ingredients || recipeDraft.ingredients.length === 0) return alert("Bitte füge mindestens eine Zutat hinzu.");
+    
+    const totalGrams = recipeDraft.ingredients.reduce((acc, i) => acc + (Number(i.grams) || 0), 0);
+    const totalKcal = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseCalories * (i.grams / 100)), 0);
+    const totalP = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseProtein * (i.grams / 100)), 0);
+    const totalC = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseCarbs * (i.grams / 100)), 0);
+    const totalS = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseSugar * (i.grams / 100)), 0);
+    const totalF = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseFat * (i.grams / 100)), 0);
+    const totalSF = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseSaturatedFat * (i.grams / 100)), 0);
+    const totalUF = recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseUnsaturatedFat * (i.grams / 100)), 0);
+
+    const servings = Math.max(1, Number(recipeDraft.servings) || 1);
+
+    // Calculate per 100g base for scaling:
+    const factor100 = totalGrams > 0 ? (100 / totalGrams) : 1;
+
+    const finalRecipe = {
+      id: recipeDraft.id || generateId(),
+      name: recipeDraft.name.trim(),
+      emoji: recipeDraft.emoji || '🥗',
+      servings: servings,
+      totalWeight: Math.round(totalGrams),
+      // Base per 100g:
+      calories: Math.round(totalKcal * factor100),
+      protein: Math.round(totalP * factor100 * 10) / 10,
+      carbs: Math.round(totalC * factor100 * 10) / 10,
+      sugar: Math.round(totalS * factor100 * 10) / 10,
+      fat: Math.round(totalF * factor100 * 10) / 10,
+      saturatedFat: Math.round(totalSF * factor100 * 10) / 10,
+      unsaturatedFat: Math.round(totalUF * factor100 * 10) / 10,
+      // Total totals:
+      totalCalories: Math.round(totalKcal),
+      totalProtein: Math.round(totalP * 10) / 10,
+      totalCarbs: Math.round(totalC * 10) / 10,
+      totalFat: Math.round(totalF * 10) / 10,
+      // Serving info:
+      unitName: servings > 1 ? 'Portion' : 'Rezept',
+      pieceWeight: Math.round(totalGrams / servings),
+      estimatedPortionWeight: Math.round(totalGrams / servings),
+      ingredientsCount: recipeDraft.ingredients.length,
+      ingredients: recipeDraft.ingredients
+    };
+
+    setRecipes(prev => [finalRecipe, ...(Array.isArray(prev) ? prev.filter(r => r.id !== finalRecipe.id) : [])]);
+    setShowRecipeModal(false);
     triggerHaptic('success');
   };
   useEffect(() => {
@@ -964,9 +1034,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       const prompt = `Analysiere folgendes Essen (Bild und/oder Text): ${text || "das Bild"}. 
                     WICHTIGSTE REGEL: Gib IMMER und AUSNAHMSLOS die Nährwerte für exakt 100 Gramm an!
                     Schätze bei 'estimatedPortionWeight' das Gewicht der GESAMTEN beschriebenen/sichtbaren Portion ab.
+                    SMARTE EINHEIT: Wenn es sich um zählbare Stückgüter handelt (z.B. Eier, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Burger, Dosen), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 55 für 1 Ei, 20 für 1 Nugget, 30 für 1 Scheibe Toast) an. Bei Schüttgut wie Reis, Haferflocken oder Quark setze 'unitName': null, 'pieceWeight': null.
                     Wähle GENAU EIN passendes Emoji aus.
                     Gib AUSSCHLIESSLICH ein einziges, valides JSON-Objekt zurück.
-                    Format: {"name":"string", "calories":int, "protein":float, "carbs":float, "sugar":float, "fat":float, "saturatedFat":float, "estimatedPortionWeight":int, "emoji":"string"}`;
+                    Format: {"name":"string", "calories":int, "protein":float, "carbs":float, "sugar":float, "fat":float, "saturatedFat":float, "estimatedPortionWeight":int, "unitName":string|null, "pieceWeight":int|null, "emoji":"string"}`;
       let contents = [{
         parts: [{
           text: prompt
@@ -1008,6 +1079,8 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       json.sugar = Number(json.sugar) || 0;
       json.fat = Number(json.fat) || 0;
       json.saturatedFat = Number(json.saturatedFat) || 0;
+      if (json.pieceWeight) json.pieceWeight = Number(json.pieceWeight);
+      if (json.unitName) json.unitName = String(json.unitName);
 
       // Sicherstellen, dass nur EIN Emoji genommen wird
       if (json.emoji) {
@@ -1228,151 +1301,168 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         </div>
       </div>
     </div>`}
-    ${selectedFood && html`<div className="fixed inset-0 bg-slate-950/90 z-[450] backdrop-blur-sm animate-in fade-in duration-300" onClick=${() => {
-      setSelectedFood(null);
-      setEditingInstanceId(null);
-    }}/>
-    <div className="fixed bottom-2.5 left-2.5 right-2.5 z-[460] glass-card rounded-[3rem] p-5 sm:p-6 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto">
-      <div className="flex items-center gap-3.5 mb-6">
-        <button onClick=${() => {
-          const input = prompt("Wähle ein Emoji:", selectedFood?.emoji || "🍽️");
-          if (input) {
-            const newEmoji = [...input.trim()][0];
-            setSelectedFood(prev => ({ ...prev, emoji: newEmoji }));
-          }
-        }} className="w-12 h-12 shrink-0 bg-slate-800/80 rounded-[1.2rem] flex items-center justify-center text-2xl border border-white/10 shadow-inner hover:bg-slate-700 transition-colors">${selectedFood?.emoji || "🍽️"}</button>
-        <input type="text" value=${selectedFood?.name || ""} placeholder="Name des Essens" onChange=${e => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent flex-1 min-w-0 text-xl sm:text-2xl font-black text-white outline-none border-b border-white/10 focus:border-brand-500"/>
-        <button type="button" onClick=${() => {
-          setSelectedFood(null);
-          setEditingInstanceId(null);
-        }} className="shrink-0 p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
-      </div>
-      <div className="space-y-6 mb-8">
-        <div className="flex items-center gap-4">
-          <button type="button" onClick=${() => { triggerHaptic('light'); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation"><${MinusIcon} size=${20}/></button>
-          <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex items-center justify-center gap-2 focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
-            <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center text-2xl font-black text-white outline-none w-full max-w-[120px]"/>
-            <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
-          </div>
-          <button type="button" onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 50); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation"><${PlusIcon} size=${20}/></button>
-        </div>
+    ${selectedFood && (() => {
+      const unitInfo = getSmartFoodUnit(selectedFood);
+      const pieceCount = unitInfo ? Math.max(1, Math.round((Number(amount) || unitInfo.pieceWeight) / unitInfo.pieceWeight)) : null;
 
-        <div className="flex gap-2 overflow-x-auto pb-1 -mt-2 scrollbar-none">
-          ${[
-            ...(selectedFood?.estimatedPortionWeight ? [{ label: `AI (${selectedFood.estimatedPortionWeight}g)`, val: selectedFood.estimatedPortionWeight }] : []),
-            { label: '50g', val: 50 },
-            { label: '100g', val: 100 },
-            { label: '150g', val: 150 },
-            { label: '200g', val: 200 },
-            { label: '250g', val: 250 },
-            { label: '500g', val: 500 }
-          ].map(chip => html`
-            <button
-              key=${chip.label}
-              type="button"
-              onClick=${() => { triggerHaptic('light'); setAmount(chip.val); }}
-              className=${`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
-                Number(amount) === chip.val
-                  ? 'bg-brand-500 text-slate-950 border-brand-400 font-black shadow-[0_0_12px_rgba(139,92,246,0.4)]'
-                  : 'bg-slate-900/90 text-slate-400 border-white/10 hover:text-white'
-              }`}
-            >
-              ${chip.label}
-            </button>
-          `)}
+      return html`<div className="fixed inset-0 bg-slate-950/90 z-[450] backdrop-blur-sm animate-in fade-in duration-300" onClick=${() => {
+        setSelectedFood(null);
+        setEditingInstanceId(null);
+      }}/>
+      <div className="fixed bottom-2.5 left-2.5 right-2.5 z-[460] glass-card rounded-[3rem] p-5 sm:p-6 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-3.5 mb-6">
+          <button onClick=${() => {
+            const input = prompt("Wähle ein Emoji:", selectedFood?.emoji || "🍽️");
+            if (input) {
+              const newEmoji = [...input.trim()][0];
+              setSelectedFood(prev => ({ ...prev, emoji: newEmoji }));
+            }
+          }} className="w-12 h-12 shrink-0 bg-slate-800/80 rounded-[1.2rem] flex items-center justify-center text-2xl border border-white/10 shadow-inner hover:bg-slate-700 transition-colors">${selectedFood?.emoji || "🍽️"}</button>
+          <input type="text" value=${selectedFood?.name || ""} placeholder="Name des Essens" onChange=${e => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent flex-1 min-w-0 text-xl sm:text-2xl font-black text-white outline-none border-b border-white/10 focus:border-brand-500"/>
+          <button type="button" onClick=${() => {
+            setSelectedFood(null);
+            setEditingInstanceId(null);
+          }} className="shrink-0 p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
         </div>
-
-        <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
-          <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
-            <div className="border-r border-white/10 px-4 py-2.5 text-xs font-bold text-slate-400">Nährstoff</div>
-            <div className="border-r border-white/10 px-2 py-2.5 text-xs font-bold text-slate-400 text-center">pro 100g ✏️</div>
-            <div className="px-3 py-2 text-center leading-tight">
-              <div className="text-[11px] font-bold text-slate-400">Portion</div>
-              <div className="text-slate-400 font-bold text-xs">${amount}g</div>
+        <div className="space-y-6 mb-8">
+          ${unitInfo ? html`
+            <div className="flex items-center gap-4">
+              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount(Math.max(unitInfo.pieceWeight, (amount || unitInfo.pieceWeight) - unitInfo.pieceWeight)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem]">
+                <${MinusIcon} size=${18}/>
+                <span className="text-[9px] font-black uppercase text-slate-400">-1 ${unitInfo.unitName}</span>
+              </button>
+              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
+                <div className="text-xl sm:text-2xl font-black text-white">${pieceCount} ${unitInfo.unitName}</div>
+                <div className="flex items-center gap-1 text-slate-400 text-xs font-bold mt-0.5">
+                  <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center font-bold text-slate-300 outline-none w-14 border-b border-white/10 focus:border-brand-400"/>
+                  <span>g</span>
+                </div>
+              </div>
+              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + unitInfo.pieceWeight); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem]">
+                <${PlusIcon} size=${18}/>
+                <span className="text-[9px] font-black uppercase text-slate-950">+1 ${unitInfo.unitName}</span>
+              </button>
             </div>
-          </div>
-          <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-brand-400">🔥 Energie</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-brand-400/60 transition-all text-brand-400">
-      <input type="number" inputMode="decimal" value=${selectedFood?.calories ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, calories: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">kcal</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400 bg-slate-900/30 transition-all duration-200">
-    ${Math.round((Number(selectedFood?.calories ?? 0) || 0) * ((amount || 0) / 100))}<span className="text-[10px] pointer-events-none">kcal</span>
-  </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-fuchsia-400">💪🏼 Protein</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-fuchsia-400/60 transition-all text-fuchsia-400">
-      <input type="number" inputMode="decimal" value=${selectedFood?.protein ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, protein: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">g</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400 bg-slate-900/30 transition-all duration-200">
-    ${Number((Number(selectedFood?.protein ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
-  </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-400">🍞 Kohlenhydrate</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-400">
-      <input type="number" inputMode="decimal" value=${selectedFood?.carbs ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, carbs: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">g</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400 bg-slate-900/30 transition-all duration-200">
-    ${Number((Number(selectedFood?.carbs ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
-  </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-500"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🍭 Zucker</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-500">
-      <input type="number" inputMode="decimal" value=${selectedFood?.sugar ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, sugar: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">g</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500 bg-slate-900/30 transition-all duration-200">
-    ${Number((Number(selectedFood?.sugar ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
-  </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-400">
-      <input type="number" inputMode="decimal" value=${selectedFood?.fat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, fat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">g</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400 bg-slate-900/30 transition-all duration-200">
-    ${Number((Number(selectedFood?.fat ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
-  </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-200"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🌱 ungesättigt</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-200">
-      <input type="number" inputMode="decimal" value=${selectedFood?.unsaturatedFat !== undefined ? selectedFood.unsaturatedFat : Math.max(0, (Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0))} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, unsaturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">g</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200 bg-slate-900/30 transition-all duration-200">
-    ${Number((Number(selectedFood?.unsaturatedFat !== undefined ? selectedFood.unsaturatedFat : Math.max(0, (Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0))) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
-  </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center ">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
-  <div className="border-r border-white/10 p-1.5">
-    <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-600">
-      <input type="number" inputMode="decimal" value=${selectedFood?.saturatedFat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, saturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
-      <span className="text-[10px] pointer-events-none">g</span>
-    </div>
-  </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600 bg-slate-900/30 transition-all duration-200">
-    ${Number((Number(selectedFood?.saturatedFat ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
-  </div>
-</div>
-        </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1 -mt-2 scrollbar-none">
+              ${[1, 2, 3, 4, 5, 6, 10].map(cnt => html`
+                <button
+                  key=${cnt}
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setAmount(cnt * unitInfo.pieceWeight); }}
+                  className=${`shrink-0 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all ${
+                    pieceCount === cnt
+                      ? 'bg-brand-500 text-slate-950 border-brand-400 font-black shadow-[0_0_12px_rgba(139,92,246,0.4)]'
+                      : 'bg-slate-900/90 text-slate-400 border-white/10 hover:text-white'
+                  }`}
+                >
+                  ${cnt}x (${cnt * unitInfo.pieceWeight}g)
+                </button>
+              `)}
+            </div>
+          ` : html`
+            <div className="flex items-center gap-4">
+              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation"><${MinusIcon} size=${20}/></button>
+              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex items-center justify-center gap-2 focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
+                <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center text-2xl font-black text-white outline-none w-full max-w-[120px]"/>
+                <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
+              </div>
+              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 50); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation"><${PlusIcon} size=${20}/></button>
+            </div>
+          `}
+
+          <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
+            <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
+              <div className="border-r border-white/10 px-4 py-2.5 text-xs font-bold text-slate-400">Nährstoff</div>
+              <div className="border-r border-white/10 px-2 py-2.5 text-xs font-bold text-slate-400 text-center">pro 100g ✏️</div>
+              <div className="px-3 py-2 text-center leading-tight">
+                <div className="text-[11px] font-bold text-slate-400">Portion</div>
+                <div className="text-slate-400 font-bold text-xs">${amount}g</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-brand-400">🔥 Energie</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-brand-400/60 transition-all text-brand-400">
+        <input type="number" inputMode="decimal" value=${selectedFood?.calories ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, calories: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">kcal</span>
       </div>
-      <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
-    </div>`}
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400 bg-slate-900/30 transition-all duration-200">
+      ${Math.round((Number(selectedFood?.calories ?? 0) || 0) * ((amount || 0) / 100))}<span className="text-[10px] pointer-events-none">kcal</span>
+    </div>
+  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-fuchsia-400">💪🏼 Protein</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-fuchsia-400/60 transition-all text-fuchsia-400">
+        <input type="number" inputMode="decimal" value=${selectedFood?.protein ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, protein: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">g</span>
+      </div>
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400 bg-slate-900/30 transition-all duration-200">
+      ${Number((Number(selectedFood?.protein ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
+    </div>
+  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-400">🍞 Kohlenhydrate</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-400">
+        <input type="number" inputMode="decimal" value=${selectedFood?.carbs ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, carbs: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">g</span>
+      </div>
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400 bg-slate-900/30 transition-all duration-200">
+      ${Number((Number(selectedFood?.carbs ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
+    </div>
+  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-500"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🍭 Zucker</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-500">
+        <input type="number" inputMode="decimal" value=${selectedFood?.sugar ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, sugar: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">g</span>
+      </div>
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500 bg-slate-900/30 transition-all duration-200">
+      ${Number((Number(selectedFood?.sugar ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
+    </div>
+  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-400">
+        <input type="number" inputMode="decimal" value=${selectedFood?.fat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, fat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">g</span>
+      </div>
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400 bg-slate-900/30 transition-all duration-200">
+      ${Number((Number(selectedFood?.fat ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
+    </div>
+  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-200"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🌱 ungesättigt</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-200">
+        <input type="number" inputMode="decimal" value=${selectedFood?.unsaturatedFat !== undefined ? selectedFood.unsaturatedFat : Math.max(0, (Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0))} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, unsaturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">g</span>
+      </div>
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200 bg-slate-900/30 transition-all duration-200">
+      ${Number((Number(selectedFood?.unsaturatedFat !== undefined ? selectedFood.unsaturatedFat : Math.max(0, (Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0))) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
+    </div>
+  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center ">
+    <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
+    <div className="border-r border-white/10 p-1.5">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1.5 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-600">
+        <input type="number" inputMode="decimal" value=${selectedFood?.saturatedFat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, saturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+        <span className="text-[10px] pointer-events-none">g</span>
+      </div>
+    </div>
+    <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600 bg-slate-900/30 transition-all duration-200">
+      ${Number((Number(selectedFood?.saturatedFat ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
+    </div>
+  </div>
+          </div>
+        </div>
+        <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full bg-brand-500 text-slate-950 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
+      </div>`;
+    })()}
     ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
   <button onClick=${() => {
     triggerHaptic('light');
@@ -1391,14 +1481,14 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     triggerHaptic('light');
     setSelectedDate(addDaysToDateStr(selectedDate, 1));
   }} className="p-1 text-slate-500 hover:text-white active:scale-90 transition-all"><${ArrowRightIcon} size=${14}/></button>
-</div></div><div className="flex gap-2"><button onClick=${() => { triggerHaptic('light'); setShowWeightModal(true); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400" title="Gewicht"><${ScaleIcon} size=${20}/></button><button onClick=${() => { triggerHaptic('light'); setShowAiCoach(true); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400" title="KI-Coach"><${SparklesIcon} size=${20}/></button><button onClick=${() => { triggerHaptic('light'); setView('profile'); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg" title="Profil & Ziele"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪🏼 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 Zucker" value=${totals.s} color="text-blue-600 dark:text-blue-500" valueSuffix=${totals.s >= 50 ? "⚠️" : null} animate=${totals.s >= 50}/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="🧈 gesättigt" value=${totals.sf} color="text-amber-600"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-amber-200"/></div></div></div></div>
+</div></div><div className="flex gap-2"><button onClick=${() => { triggerHaptic('light'); setShowAiCoach(true); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400" title="KI-Coach"><${SparklesIcon} size=${20}/></button><button onClick=${() => { triggerHaptic('light'); setView('profile'); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg" title="Profil & Ziele"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪🏼 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 Zucker" value=${totals.s} color="text-blue-600 dark:text-blue-500" valueSuffix=${totals.s >= 50 ? "⚠️" : null} animate=${totals.s >= 50}/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="🧈 gesättigt" value=${totals.sf} color="text-amber-600"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-amber-200"/></div></div></div></div>
 <button onClick=${() => { triggerHaptic('light'); setView('addFood'); }} className="fixed bottom-6 right-6 z-[100] w-16 h-16 bg-brand-500 text-slate-950 rounded-[2rem] flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.4)] active:scale-90 transition-all border border-brand-400">
     <${PlusIcon} size=${30} strokeWidth=${3} />
 </button>
-<div className="space-y-4"><div className="flex justify-between items-center px-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">📅 Tagebuch</h3>${dailyLog.items && dailyLog.items.length > 0 && html`<button onClick=${saveDayAsRecipe} className="text-[9px] font-black uppercase tracking-wider text-brand-400 bg-brand-500/10 px-2.5 py-1 rounded-lg border border-brand-500/20 hover:bg-brand-500/20 active:scale-95 transition-all flex items-center gap-1.5"><${BookIcon} size=${12}/> Als Rezept</button>`}</div><div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => setShowDetails(selected)} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div></div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => {
+<div className="space-y-4"><div className="flex justify-between items-center px-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">📅 Tagebuch</h3></div><div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => setShowDetails(selected)} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div></div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => {
     setView('dashboard');
     setApiResults([]);
-  }} className="p-4 glass-card rounded-2xl"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-5 mb-10"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-5 pr-14 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner"/><button onClick=${() => triggerSearch()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-brand-400 active:scale-90 transition-all"><${SearchIcon} size=${20}/></button></div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="grid grid-cols-4 gap-2"><button onClick=${handleAiTextClick} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white">${isThinking ? html`<${LoaderIcon} size=${15}/>` : html`<${SparklesIcon} size=${15} className="text-brand-400"/>`} AI Text</button><button onClick=${() => aiFileRef.current.click()} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${CameraIcon} size=${15} className="text-brand-400"/> AI Foto</button><button onClick=${startVoiceInput} disabled=${isThinking || isListening} className=${`bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white ${isListening ? 'ring-2 ring-rose-500 animate-pulse text-rose-400' : ''}`}><${MicIcon} size=${15} className=${isListening ? 'text-rose-400 animate-bounce' : 'text-brand-400'}/> ${isListening ? 'Hört zu...' : 'AI Voice'}</button><button onClick=${() => {
+  }} className="p-4 glass-card rounded-2xl"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-5 mb-10"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-5 pr-14 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner"/><button onClick=${() => triggerSearch()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-brand-400 active:scale-90 transition-all"><${SearchIcon} size=${20}/></button></div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="flex gap-3"><button onClick=${handleAiTextClick} disabled=${isThinking} className="flex-1 bg-slate-900 border border-white/10 py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:bg-slate-800 transition-colors text-white">${isThinking ? html`<${LoaderIcon} size=${14}/>` : html`<${SparklesIcon} size=${14} className="text-brand-400"/>`} AI Text</button><button onClick=${() => aiFileRef.current.click()} disabled=${isThinking} className="flex-1 bg-slate-900 border border-white/10 py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:bg-slate-800 transition-colors text-white"><${CameraIcon} size=${16} className="text-brand-400"/> AI Foto</button><button onClick=${() => {
     setSelectedFood({
       name: '',
       calories: 0,
@@ -1411,7 +1501,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       isManual: true
     });
     setAmount(100);
-  }} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${PlusIcon} size=${15} className="text-brand-400"/> Manuell</button></div><input type="file" accept="image/*" capture="environment" ref=${aiFileRef} className="hidden" onChange=${async e => {
+  }} className="flex-1 bg-slate-900 border border-white/10 py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:bg-slate-800 transition-colors text-white"><${PlusIcon} size=${16} className="text-brand-400"/> Manuell</button></div><input type="file" accept="image/*" capture="environment" ref=${aiFileRef} className="hidden" onChange=${async e => {
     if (e.target.files[0]) {
       const base64 = await resizeImage(e.target.files[0]);
       setAiImage(base64);
@@ -1426,44 +1516,64 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     </div>
     <div className="space-y-3">
       ${activeTab === 'recipes' ? html`
-        ${recipes.length === 0 ? html`
-          <div className="py-12 px-6 text-center space-y-2 glass-card rounded-[2rem] border border-white/5">
-            <div className="text-3xl">🥗</div>
-            <div className="text-sm font-bold text-white">Noch keine Rezepte gespeichert</div>
-            <p className="text-xs text-slate-500 leading-relaxed">Gehe im Dashboard auf dein Tagebuch und tippe auf <span className="text-brand-400 font-bold">"Als Rezept"</span>, um alle Mahlzeiten des Tages als Vorlage zu speichern!</p>
-          </div>
-        ` : recipes.map(rec => html`
-          <div key=${rec.id} className="glass-card p-4 rounded-[2rem] flex justify-between items-center animate-in zoom-in cursor-pointer active:scale-[0.98] transition-transform duration-150" onClick=${() => selectFood(rec)}>
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
-                ${rec.emoji || '🥗'}
-              </div>
-              <div className="flex-1 min-w-0 py-0.5">
-                <div className="font-bold text-sm text-white break-words leading-snug">${rec.name}</div>
-                <div className="text-[10px] font-black text-slate-500 uppercase truncate">${rec.calories} kcal | P: ${rec.protein}g C: ${rec.carbs}g F: ${rec.fat}g</div>
-              </div>
+        <div className="space-y-4">
+          <button onClick=${openNewRecipeModal} className="w-full py-4 bg-brand-500/10 border border-brand-500/30 text-brand-400 rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-brand-500/20 active:scale-95 transition-all shadow-lg">
+            <${PlusIcon} size=${18}/> Neues Rezept erstellen
+          </button>
+          ${recipes.length === 0 ? html`
+            <div className="py-12 px-6 text-center space-y-2 glass-card rounded-[2rem] border border-white/5">
+              <div className="text-3xl">🥗</div>
+              <div className="text-sm font-bold text-white">Noch keine Rezepte erstellt</div>
+              <p className="text-xs text-slate-500 leading-relaxed">Tippe oben auf <span className="text-brand-400 font-bold">„Neues Rezept erstellen“</span>, um deine eigenen Mahlzeiten mit Zutaten zusammenzustellen!</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick=${e => {
-                e.stopPropagation();
-                triggerHaptic('delete');
-                setRecipes(prev => prev.filter(r => r.id !== rec.id));
-              }} className="p-2 text-slate-600 hover:text-rose-500 transition-colors"><${TrashIcon} size=${16}/></button>
-              <div className="p-2 bg-brand-500 text-slate-950 rounded-xl shadow-lg"><${PlusIcon} size=${18}/></div>
-            </div>
-          </div>
-        `)}
+          ` : recipes.map(rec => html`
+            <${SwipeableItem}
+              key=${rec.id}
+              onSelect=${() => selectFood(rec)}
+              onDelete=${() => setRecipes(prev => prev.filter(r => r.id !== rec.id))}
+            >
+              <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
+                    ${rec.emoji || '🥗'}
+                  </div>
+                  <div className="flex-1 min-w-0 py-0.5">
+                    <div className="font-bold text-sm text-white break-words leading-snug">${rec.name}</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${rec.totalCalories || rec.calories} kcal ${rec.servings > 1 ? `(${rec.servings} Port.)` : ''} | P: ${rec.totalProtein || rec.protein}g C: ${rec.totalCarbs || rec.carbs}g F: ${rec.totalFat || rec.fat}g</div>
+                  </div>
+                </div>
+                <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
+                  <${PlusIcon} size=${16}/>
+                </div>
+              </div>
+            </${SwipeableItem}>
+          `)}
+        </div>
       ` : (activeTab === 'frequent' ? frequentItems : recentItems).map(item => {
         const portionWeight = item.lastAmount || 100;
         const portionCalories = Math.round((Number(item.baseCalories ?? item.calories ?? 0)) * (portionWeight / 100));
-        return html`<div key=${item.name} className="relative overflow-hidden rounded-[1.5rem]" onTouchStart=${e => touchStart.current = e.touches[0].clientX} onTouchEnd=${e => {
-          const delta = touchStart.current - e.changedTouches[0].clientX;
-          if (delta > 80) setSwipeId(item.name);
-          if (delta < -80) setSwipeId(null);
-        }}><div onClick=${() => {
-          setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => i.name !== item.name));
-          setSwipeId(null);
-        }} className="absolute inset-y-0 right-0 w-24 bg-slate-800/80 flex items-center justify-center text-rose-400 font-black uppercase text-[9px] tracking-widest border-l border-white/5"><${TrashIcon} size=${14} className="mr-1"/> Löschen</div><div onClick=${() => selectFood(item)} className=${`glass-card p-4 flex justify-between items-center active:scale-[0.98] transition-transform duration-150 relative z-10 cursor-pointer ${swipeId === item.name ? '-translate-x-24' : ''}`}><div className="flex items-center gap-4 flex-1 min-w-0"><div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">${getItemDisplay(item)}</div><div className="flex-1 min-w-0 py-0.5"><div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div><div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionWeight}g | ${portionCalories} kcal</div></div></div><${PlusIcon} size=${16} className="text-brand-400"/></div></div>`;
+        return html`
+          <${SwipeableItem}
+            key=${item.name}
+            onSelect=${() => selectFood(item)}
+            onDelete=${() => setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => i.name !== item.name))}
+          >
+            <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
+                  ${getItemDisplay(item)}
+                </div>
+                <div className="flex-1 min-w-0 py-0.5">
+                  <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionWeight}g | ${portionCalories} kcal</div>
+                </div>
+              </div>
+              <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
+                <${PlusIcon} size=${16}/>
+              </div>
+            </div>
+          </${SwipeableItem}>
+        `;
       })}
     </div>
   </div>`}
@@ -1475,6 +1585,156 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     })}
   </div>`}
 </div>`}
+
+${showRecipeModal && (() => {
+  const totalGrams = recipeDraft.ingredients.reduce((acc, i) => acc + (Number(i.grams) || 0), 0);
+  const totalKcal = Math.round(recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseCalories * (i.grams / 100)), 0));
+  const totalP = Math.round(recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseProtein * (i.grams / 100)), 0) * 10) / 10;
+  const totalC = Math.round(recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseCarbs * (i.grams / 100)), 0) * 10) / 10;
+  const totalF = Math.round(recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseFat * (i.grams / 100)), 0) * 10) / 10;
+
+  const historyMatches = draftIngSearch.trim().length > 0 
+    ? (Array.isArray(itemHistory) ? itemHistory : []).filter(h => h?.name?.toLowerCase().includes(draftIngSearch.toLowerCase())).slice(0, 5)
+    : [];
+
+  return html`
+    <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => setShowRecipeModal(false)}/>
+    <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-black flex items-center gap-3 text-white">🥗 Rezept erstellen</h3>
+        <button onClick=${() => setShowRecipeModal(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white"><${XIcon} size=${20}/></button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button onClick=${() => {
+          const input = prompt("Wähle ein Emoji:", recipeDraft.emoji || "🥗");
+          if (input) {
+            const newEmoji = [...input.trim()][0];
+            setRecipeDraft(prev => ({ ...prev, emoji: newEmoji }));
+          }
+        }} className="w-12 h-12 shrink-0 bg-slate-800/80 rounded-2xl flex items-center justify-center text-2xl border border-white/10 shadow-inner">${recipeDraft.emoji || '🥗'}</button>
+        <input type="text" placeholder="Rezeptname (z.B. Protein-Bowl)" value=${recipeDraft.name} onChange=${e => setRecipeDraft({ ...recipeDraft, name: e.target.value })} className="flex-1 bg-slate-900 border border-white/10 rounded-2xl p-3.5 text-white font-bold outline-none focus:ring-2 focus:ring-brand-500 shadow-inner"/>
+      </div>
+
+      <div className="flex items-center justify-between p-3 bg-slate-900/60 rounded-2xl border border-white/5">
+        <span className="text-xs font-bold text-slate-400">Portionen</span>
+        <div className="flex items-center gap-3">
+          <button type="button" onClick=${() => setRecipeDraft(p => ({ ...p, servings: Math.max(1, (p.servings || 1) - 1) }))} className="p-2 bg-slate-800 rounded-xl active:scale-90 text-white"><${MinusIcon} size=${14}/></button>
+          <span className="font-black text-white text-base">${recipeDraft.servings || 1}</span>
+          <button type="button" onClick=${() => setRecipeDraft(p => ({ ...p, servings: (p.servings || 1) + 1 }))} className="p-2 bg-brand-500 text-slate-950 rounded-xl active:scale-90"><${PlusIcon} size=${14}/></button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Zutaten (${recipeDraft.ingredients.length})</span>
+        
+        <div className="space-y-2">
+          ${recipeDraft.ingredients.map(ing => {
+            const ingKcal = Math.round(ing.baseCalories * (ing.grams / 100));
+            return html`
+              <div key=${ing.id} className="flex justify-between items-center p-3 bg-slate-900/40 rounded-xl border border-white/5 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                  <span>${ing.emoji || '🍽️'}</span>
+                  <span className="font-bold text-white truncate">${ing.name}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-slate-400 font-bold">${ing.grams}g</span>
+                  <span className="text-brand-400 font-black">${ingKcal} kcal</span>
+                  <button onClick=${() => removeIngredientFromDraft(ing.id)} className="text-slate-600 hover:text-rose-500"><${TrashIcon} size=${14}/></button>
+                </div>
+              </div>
+            `;
+          })}
+        </div>
+
+        <div className="p-4 bg-slate-900/80 rounded-2xl border border-white/10 space-y-3">
+          <span className="text-[10px] font-black text-brand-400 uppercase tracking-widest block">Zutat hinzufügen</span>
+          
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Zutat suchen oder tippen..."
+              value=${draftSelectedFood ? draftSelectedFood.name : draftIngSearch}
+              onChange=${e => {
+                setDraftSelectedFood(null);
+                setDraftIngSearch(e.target.value);
+              }}
+              className="w-full p-3 bg-slate-950 border border-white/10 rounded-xl text-xs font-bold text-white outline-none focus:ring-1 focus:ring-brand-500"
+            />
+            ${historyMatches.length > 0 && !draftSelectedFood ? html`
+              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 max-h-40 overflow-y-auto">
+                ${historyMatches.map(h => html`
+                  <div
+                    key=${h.name}
+                    onClick=${() => {
+                      setDraftSelectedFood(h);
+                      setDraftIngSearch(h.name);
+                    }}
+                    className="p-2.5 hover:bg-slate-800 flex justify-between items-center cursor-pointer text-xs border-b border-white/5"
+                  >
+                    <span className="text-white font-medium">${h.emoji || '🍽️'} ${h.name}</span>
+                    <span className="text-[10px] text-slate-400">${h.baseCalories || h.calories || 0} kcal/100g</span>
+                  </div>
+                `)}
+              </div>
+            ` : ''}
+          </div>
+
+          <div className="flex gap-2 items-center">
+            <div className="flex-1 flex items-center bg-slate-950 border border-white/10 rounded-xl px-3 py-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                value=${draftIngGrams}
+                onChange=${e => setDraftIngGrams(e.target.value)}
+                placeholder="Gramm"
+                className="bg-transparent text-white font-bold text-xs outline-none w-full text-center"
+              />
+              <span className="text-slate-500 text-xs font-bold">g</span>
+            </div>
+            <button
+              onClick=${() => {
+                if (!draftSelectedFood && draftIngSearch.trim()) {
+                  // Fallback: custom typed ingredient
+                  setDraftSelectedFood({
+                    name: draftIngSearch.trim(),
+                    calories: 100,
+                    protein: 0,
+                    carbs: 0,
+                    sugar: 0,
+                    fat: 0,
+                    saturatedFat: 0
+                  });
+                }
+                setTimeout(addIngredientToDraft, 50);
+              }}
+              className="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-black text-xs rounded-xl uppercase tracking-wider active:scale-95 transition-all shadow-md"
+            >
+              + Hinzufügen
+            </button>
+          </div>
+        </div>
+      </div>
+
+      ${recipeDraft.ingredients.length > 0 && html`
+        <div className="p-4 bg-slate-900 rounded-2xl border border-white/5 space-y-1 text-center">
+          <div className="text-sm font-black text-white">Gesamt: ${totalKcal} kcal <span className="text-slate-400 text-xs font-medium">(${totalGrams}g)</span></div>
+          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">P: ${totalP}g | C: ${totalC}g | F: ${totalF}g</div>
+          ${(recipeDraft.servings || 1) > 1 && html`
+            <div className="text-[11px] font-bold text-brand-400 pt-1">↳ Pro Portion: ${Math.round(totalKcal / recipeDraft.servings)} kcal (P: ${(totalP / recipeDraft.servings).toFixed(1)}g)</div>
+          `}
+        </div>
+      `}
+
+      <button
+        onClick=${saveRecipeDraft}
+        className="w-full py-5 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl"
+      >
+        Rezept speichern
+      </button>
+    </div>
+  `;
+})()}
 
 ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => {
     setShowAiModal(false);
@@ -1565,7 +1825,6 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
         aiGoalForm: JSON.parse(localStorage.getItem('kTrackAiGoalForm') || '{}'),
         history: JSON.parse(localStorage.getItem('kTrackHistory') || '[]'),
         logs: JSON.parse(localStorage.getItem('kTrackAllLogs') || '{}'),
-        weightLogs: JSON.parse(localStorage.getItem('kTrackWeightLogs') || '[]'),
         recipes: JSON.parse(localStorage.getItem('kTrackRecipes') || '[]'),
       };
       const oldLogRaw = localStorage.getItem('kTrackLog');
@@ -1593,7 +1852,6 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
           if (data.aiGoalForm) localStorage.setItem('kTrackAiGoalForm', JSON.stringify(data.aiGoalForm));
           if (data.history) localStorage.setItem('kTrackHistory', JSON.stringify(data.history));
           if (data.logs) localStorage.setItem('kTrackAllLogs', JSON.stringify(data.logs));
-          if (data.weightLogs) localStorage.setItem('kTrackWeightLogs', JSON.stringify(data.weightLogs));
           if (data.recipes) localStorage.setItem('kTrackRecipes', JSON.stringify(data.recipes));
           alert("Erfolgreich importiert!");
           window.location.reload();
@@ -1605,106 +1863,6 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
     }}/>
   </div>
   </div></div>`}${isScanning && html`<div className="fixed inset-0 bg-slate-950 z-[300] flex flex-col items-center justify-center p-6 backdrop-blur-3xl animate-in zoom-in duration-300"><div className="w-full max-w-md glass-card rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl"><div className="flex justify-between items-center p-8 bg-slate-900/50"><h3 className="font-black text-xl text-white flex items-center gap-3"><${BarcodeIcon} size=${24} className="text-brand-400"/> Scan</h3><div className="flex items-center gap-2"><button onClick=${toggleTorch} className=${`p-3 rounded-full transition-all ${isTorchOn ? 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'bg-slate-800 text-slate-300'}`} title="Taschenlampe"><${FlashlightIcon} size=${18}/></button><button onClick=${stopBarcodeScan} className="p-2 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${XIcon} size=${20}/></button></div></div><div className="p-6"><div id="qr-reader" className="w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner"/><p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Handy etwas weiter weg halten für Fokus</p></div></div></div>`}
-
-${showWeightModal && (() => {
-  const sortedWeights = [...(Array.isArray(weightLogs) ? weightLogs : [])].sort((a, b) => new Date(a.date) - new Date(b.date));
-  const latestEntry = sortedWeights[sortedWeights.length - 1];
-  const firstEntry = sortedWeights[0];
-  const totalDiff = sortedWeights.length > 1 ? (latestEntry.weight - firstEntry.weight).toFixed(1) : null;
-
-  const minW = sortedWeights.length > 0 ? Math.min(...sortedWeights.map(w => w.weight)) - 1 : 60;
-  const maxW = sortedWeights.length > 0 ? Math.max(...sortedWeights.map(w => w.weight)) + 1 : 100;
-  const range = maxW - minW || 1;
-  const width = 320;
-  const height = 90;
-  const points = sortedWeights.map((w, idx) => {
-    const x = sortedWeights.length === 1 ? width / 2 : (idx / (sortedWeights.length - 1)) * (width - 24) + 12;
-    const y = height - 15 - ((w.weight - minW) / range) * (height - 30);
-    return `${x},${y}`;
-  }).join(' ');
-
-  return html`
-    <div className="fixed inset-0 bg-slate-950/95 z-[400] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => setShowWeightModal(false)}>
-      <div className="w-full max-w-md glass-card rounded-[2.5rem] p-6 space-y-5 animate-in zoom-in duration-200 overflow-y-auto max-h-[85vh]" onClick=${e => e.stopPropagation()}>
-        <div className="flex justify-between items-center">
-          <h3 className="text-xl font-black flex items-center gap-3 text-white"><${ScaleIcon} className="text-brand-400"/> Gewichts-Tracker</h3>
-          <button onClick=${() => setShowWeightModal(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white"><${XIcon} size=${20}/></button>
-        </div>
-
-        ${sortedWeights.length > 0 && html`
-          <div className="bg-slate-900/60 rounded-[2rem] p-5 border border-white/5 space-y-3">
-            <div className="flex justify-between items-end">
-              <div>
-                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest block">Aktuelles Gewicht</span>
-                <span className="text-3xl font-black text-white">${latestEntry.weight} <span className="text-sm font-bold text-slate-400">kg</span></span>
-              </div>
-              ${totalDiff !== null && html`
-                <div className=${`text-right font-black text-xs px-2.5 py-1 rounded-xl ${Number(totalDiff) <= 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                  ${Number(totalDiff) > 0 ? `+${totalDiff}` : totalDiff} kg Gesamt
-                </div>
-              `}
-            </div>
-
-            ${sortedWeights.length > 1 && html`
-              <div className="pt-2">
-                <svg viewBox="0 0 ${width} ${height}" className="w-full h-24 overflow-visible">
-                  <polyline fill="none" stroke="#8b5cf6" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points=${points} />
-                  ${sortedWeights.map((w, idx) => {
-                    const x = (idx / (sortedWeights.length - 1)) * (width - 24) + 12;
-                    const y = height - 15 - ((w.weight - minW) / range) * (height - 30);
-                    return html`<circle key=${w.id} cx=${x} cy=${y} r="4" fill="#c084fc" stroke="#070b14" strokeWidth="2"/>`;
-                  })}
-                </svg>
-              </div>
-            `}
-          </div>
-        `}
-
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block px-1">Gewicht für ${parseLocalDate(selectedDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })} eintragen</label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.1"
-              placeholder="z.B. 79.5"
-              value=${newWeightInput}
-              onChange=${e => setNewWeightInput(e.target.value)}
-              onKeyDown=${e => e.key === 'Enter' && logWeightEntry(newWeightInput)}
-              className="flex-1 p-4 bg-slate-900 border border-white/10 rounded-2xl text-white font-bold outline-none focus:ring-2 focus:ring-brand-500 shadow-inner"
-            />
-            <button
-              onClick=${() => logWeightEntry(newWeightInput)}
-              className="px-6 bg-brand-500 text-slate-950 font-black rounded-2xl uppercase tracking-wider text-xs active:scale-95 transition-all shadow-lg"
-            >
-              Speichern
-            </button>
-          </div>
-        </div>
-
-        <div className="space-y-2 pt-2">
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest block px-1">Verlauf</span>
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-            ${sortedWeights.length === 0 ? html`
-              <div className="text-center py-6 text-xs text-slate-600 italic">Noch keine Einträge</div>
-            ` : [...sortedWeights].reverse().map(w => html`
-              <div key=${w.id} className="flex justify-between items-center p-3 bg-slate-900/40 rounded-xl border border-white/5 text-xs">
-                <span className="text-slate-400 font-medium">${parseLocalDate(w.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' })}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-white font-black">${w.weight} kg</span>
-                  <button onClick=${() => {
-                    triggerHaptic('delete');
-                    setWeightLogs(prev => prev.filter(x => x.id !== w.id));
-                  }} className="text-slate-600 hover:text-rose-500"><${TrashIcon} size=${14}/></button>
-                </div>
-              </div>
-            `)}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-})()}
 
 ${showCalendarModal && (() => {
   const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
