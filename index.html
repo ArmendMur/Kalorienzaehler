@@ -505,7 +505,7 @@ const ProgressRing = React.memo(({
             <${AnimatedNumber} value=${Math.round(consumedKcal)} />
           </div>
           <div className="text-[10px] font-bold text-slate-400 mt-1">
-            von <span className="text-white font-black">${Math.round(effectiveTarget)}</span> kcal
+            von ${Math.round(effectiveTarget)} kcal
           </div>
 
           <div className=${`text-[10px] font-black uppercase tracking-wider mt-1 ${
@@ -1832,7 +1832,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 <div className="space-y-4">
   <div className="flex justify-between items-center px-4">
     <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">📅 Tagebuch</h3>
-    <button onClick=${() => { triggerHaptic('light'); setEditingInstanceId(null); setActivityDraft(null); setShowActivityModal(true); setActivityStep('input'); }} className="text-[9px] font-black uppercase tracking-wider text-slate-300 bg-slate-900 px-2.5 py-1 rounded-lg border border-white/10 hover:bg-slate-800 active:scale-95 transition-all flex items-center gap-1">
+    <button onClick=${() => { triggerHaptic('light'); setEditingInstanceId(null); setActivityDraft(null); setShowActivityModal(true); setActivityStep('input'); }} className="text-[9px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 hover:bg-amber-500/20 active:scale-95 transition-all flex items-center gap-1">
       <${ZapIcon} size=${11} className="text-amber-400"/> + Aktivität
     </button>
   </div>
@@ -2204,7 +2204,7 @@ ${showActivityModal && html`
           type="button"
           onClick=${() => calculateActivityViaAi(activityInput)}
           disabled=${isActivityLoading}
-          className="w-full py-4 bg-brand-500 hover:bg-brand-400 text-slate-950 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl text-xs"
+          className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl text-xs"
         >
           ${isActivityLoading ? html`<${LoaderIcon} size=${18}/> Berechne...` : html`<${SparklesIcon} size=${18}/> Kalorien via KI schätzen`}
         </button>
@@ -2232,10 +2232,10 @@ ${showActivityModal && html`
                   });
                   setActivityStep('preview');
                 }}
-                className="p-3 bg-slate-900/80 hover:bg-slate-900 border border-white/5 hover:border-white/20 rounded-2xl flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] transition-all shadow-sm"
+                className="p-3 bg-slate-900/80 hover:bg-slate-900 border border-amber-500/20 hover:border-amber-500/40 rounded-2xl flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] transition-all shadow-sm"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-800/80 border border-white/10 flex items-center justify-center text-xl shadow-inner">
+                  <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-xl text-amber-400 shadow-inner">
                     ${act.emoji || '⚡'}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -2250,7 +2250,7 @@ ${showActivityModal && html`
                   <button
                     type="button"
                     onClick=${() => saveActivity(act)}
-                    className="p-2 bg-slate-800 hover:bg-brand-500 text-slate-300 hover:text-slate-950 rounded-xl border border-white/10 active:scale-90 transition-all"
+                    className="p-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-slate-950 rounded-xl border border-amber-500/30 active:scale-90 transition-all"
                     title="Direkt eintragen"
                   >
                     <${PlusIcon} size=${16}/>
@@ -2274,7 +2274,7 @@ ${showActivityModal && html`
       </div>
     ` : html`
       <div className="space-y-5 animate-in zoom-in duration-200">
-        <div className="p-5 bg-slate-900/90 rounded-[2rem] border border-white/10 space-y-4">
+        <div className="p-5 bg-slate-900/90 rounded-[2rem] border border-amber-500/30 space-y-4">
           <div className="flex items-center gap-3.5">
             <button onClick=${() => {
               const input = prompt("Wähle ein Emoji:", activityDraft?.emoji || "⚡");
@@ -2282,14 +2282,14 @@ ${showActivityModal && html`
                 const newEmoji = [...input.trim()][0];
                 setActivityDraft(p => ({ ...p, emoji: newEmoji }));
               }
-            }} className="w-12 h-12 shrink-0 bg-slate-800/80 rounded-2xl flex items-center justify-center text-2xl border border-white/10 shadow-inner">
+            }} className="w-12 h-12 shrink-0 bg-amber-500/15 rounded-2xl flex items-center justify-center text-2xl border border-amber-500/30 shadow-inner text-amber-400">
               ${activityDraft?.emoji || '⚡'}
             </button>
             <input
               type="text"
               value=${activityDraft?.name || ''}
               onChange=${e => setActivityDraft({ ...activityDraft, name: e.target.value })}
-              className="flex-1 bg-transparent text-lg font-black text-white outline-none border-b border-white/10 focus:border-brand-400"
+              className="flex-1 bg-transparent text-lg font-black text-white outline-none border-b border-white/10 focus:border-amber-400"
             />
           </div>
 
@@ -2313,7 +2313,7 @@ ${showActivityModal && html`
               </div>
             </div>
 
-            <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-amber-500/20 space-y-1">
+            <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-amber-500/30 space-y-1">
               <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider block">Verbrannt</span>
               <div className="flex items-center gap-1">
                 <span className="text-amber-400 font-bold text-lg">-</span>
@@ -2345,7 +2345,7 @@ ${showActivityModal && html`
           <button
             type="button"
             onClick=${() => saveActivity()}
-            className="w-full py-5 bg-brand-500 hover:bg-brand-400 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"
+            className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl flex items-center justify-center gap-2"
           >
             <${CheckIcon} size=${20}/> Aktivität eintragen
           </button>
