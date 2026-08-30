@@ -367,9 +367,9 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
 
 const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => html`
   <${SwipeableItem} onSelect=${() => item.isActivity ? (onSelectActivity && onSelectActivity(item)) : (onSelect && onSelect(item))} onDelete=${() => onDelete(item.instanceId)}>
-    <div className=${`glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 ${item.isActivity ? 'bg-slate-900/95 border border-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.08)]' : 'bg-slate-900/90'}`}>
+    <div className=${`glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 ${item.isActivity ? 'bg-slate-900/95 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-900/90'}`}>
       <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className=${`shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl flex items-center justify-center text-xl shadow-inner border ${item.isActivity ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-slate-800/50 border-white/5'}`}>
+        <div className=${`shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl flex items-center justify-center text-xl shadow-inner border ${item.isActivity ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.1)]' : 'bg-slate-800/50 border-white/5'}`}>
           ${getItemDisplay(item)}
         </div>
         <div className="flex-1 min-w-0 py-0.5">
@@ -1851,7 +1851,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 </div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => {
     setView('dashboard');
     setApiResults([]);
-  }} className="p-4 glass-card rounded-2xl"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-5 mb-10"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-5 pr-14 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner"/><button onClick=${() => triggerSearch()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-brand-400 active:scale-90 transition-all"><${SearchIcon} size=${20}/></button></div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="grid grid-cols-4 gap-2"><button onClick=${handleAiTextClick} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white">${isThinking ? html`<${LoaderIcon} size=${15}/>` : html`<${SparklesIcon} size=${15} className="text-brand-400"/>`} AI Text</button><button onClick=${() => aiFileRef.current.click()} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${CameraIcon} size=${15} className="text-brand-400"/> AI Foto</button><button onClick=${() => { triggerHaptic('light'); setShowActivityModal(true); setActivityStep('input'); }} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${ZapIcon} size=${15} className="text-amber-400"/> Aktivität</button><button onClick=${() => {
+  }} className="p-4 glass-card rounded-2xl"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-5 mb-10"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-5 pr-14 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner"/><button onClick=${() => triggerSearch()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-brand-400 active:scale-90 transition-all"><${SearchIcon} size=${20}/></button></div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="grid grid-cols-4 gap-2"><button onClick=${handleAiTextClick} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white">${isThinking ? html`<${LoaderIcon} size=${15}/>` : html`<${SparklesIcon} size=${15} className="text-brand-400"/>`} AI Text</button><button onClick=${() => aiFileRef.current.click()} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${CameraIcon} size=${15} className="text-brand-400"/> AI Foto</button><button onClick=${() => { triggerHaptic('light'); setShowActivityModal(true); setActivityStep('input'); }} disabled=${isThinking} className="bg-amber-500/10 border border-amber-500/30 py-3.5 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-amber-500/20 transition-all text-amber-400"><${ZapIcon} size=${15} className="text-amber-400"/> Aktivität</button><button onClick=${() => {
     setSelectedFood({
       name: '',
       calories: 0,
@@ -2169,23 +2169,23 @@ ${showActivityModal && html`
     setActivityDraft(null);
     setActivityStep('input');
   }}/>
-  <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 sm:p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10" onClick=${e => e.stopPropagation()}>
+  <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 sm:p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-amber-500/30" onClick=${e => e.stopPropagation()}>
     <div className="flex justify-between items-center">
-      <h3 className="text-xl font-black flex items-center gap-3 text-white">
+      <h3 className="text-xl font-black flex items-center gap-3 text-amber-400">
         <${ZapIcon} className="text-amber-400" size=${22}/> KI-Aktivitäts-Tracker
       </h3>
       <button type="button" onClick=${() => {
         setShowActivityModal(false);
         setActivityDraft(null);
         setActivityStep('input');
-      }} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white">
+      }} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white hover:text-amber-400">
         <${XIcon} size=${20}/>
       </button>
     </div>
 
     ${activityStep === 'input' ? html`
       <div className="space-y-4">
-        <div className="p-3.5 bg-slate-900/70 rounded-2xl border border-white/5 flex items-center justify-between text-[11px] font-bold">
+        <div className="p-3.5 bg-slate-900/70 rounded-2xl border border-amber-500/20 flex items-center justify-between text-[11px] font-bold">
           <span className="text-slate-400">👤 Deine Profildaten:</span>
           <span className="text-white">${aiGoalForm.gender || 'männlich'}, ${aiGoalForm.weight || 75} kg, ${aiGoalForm.height || 180} cm</span>
         </div>
@@ -2196,7 +2196,7 @@ ${showActivityModal && html`
             placeholder="z.B. 45 Min intensives Krafttraining Oberkörper, 30 Min Joggen (5km), 1 Std. Radfahren, 4000 Schritte Spaziergang..."
             value=${activityInput}
             onChange=${e => setActivityInput(e.target.value)}
-            className="w-full p-4 bg-slate-900 border border-white/10 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none text-xs sm:text-sm font-medium text-white shadow-inner h-24 resize-none"
+            className="w-full p-4 bg-slate-900 border border-amber-500/20 focus:border-amber-400 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none text-xs sm:text-sm font-medium text-white shadow-inner h-24 resize-none"
           />
         </div>
 
