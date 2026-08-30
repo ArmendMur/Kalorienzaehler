@@ -137,12 +137,174 @@ const resizeImage = file => {
   });
 };
 
-// --- COMPONENTS ---
+// --- COMPONENTS & HELPERS ---
+
+const triggerHaptic = (type = 'light') => {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    if (type === 'success') navigator.vibrate([30, 50, 30]);
+    else if (type === 'delete') navigator.vibrate(40);
+    else navigator.vibrate(20);
+  }
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      if (!window._hapticCtx) {
+        window._hapticCtx = new AudioContext();
+      }
+      const ctx = window._hapticCtx;
+      if (ctx.state === 'suspended') {
+        ctx.resume();
+      }
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      const now = ctx.currentTime;
+      if (type === 'success') {
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+        osc.start(now);
+        osc.stop(now + 0.08);
+      } else if (type === 'delete') {
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.07);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+        osc.start(now);
+        osc.stop(now + 0.07);
+      } else {
+        osc.frequency.setValueAtTime(300, now);
+        gain.gain.setValueAtTime(0.02, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+        osc.start(now);
+        osc.stop(now + 0.03);
+      }
+    }
+  } catch(e) {}
+};
 
 const getLocalToday = () => {
   const d = new Date();
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().split('T')[0];
+};
+
+const parseLocalDate = (dateStr) => {
+  if (!dateStr) return new Date();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+const formatLocalDate = (d) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const addDaysToDateStr = (dateStr, days) => {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return formatLocalDate(d);
+};
+
+const SwipeableLogItem = ({ item, onSelect, onDelete }) => {
+  const [translateX, setTranslateX] = useState(0);
+  const [isSwiping, setIsSwiping] = useState(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const isHorizontal = useRef(null);
+
+  const handleTouchStart = (e) => {
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    isHorizontal.current = null;
+    setIsSwiping(false);
+  };
+
+  const handleTouchMove = (e) => {
+    const diffX = e.touches[0].clientX - startX.current;
+    const diffY = e.touches[0].clientY - startY.current;
+
+    if (isHorizontal.current === null) {
+      if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+        isHorizontal.current = Math.abs(diffX) > Math.abs(diffY);
+      }
+    }
+
+    if (isHorizontal.current) {
+      if (e.cancelable) e.preventDefault();
+      setIsSwiping(true);
+      if (diffX < 0) {
+        setTranslateX(Math.max(diffX, -95));
+      } else {
+        setTranslateX(0);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (translateX < -55) {
+      setTranslateX(-80);
+      triggerHaptic('light');
+    } else {
+      setTranslateX(0);
+    }
+    setTimeout(() => setIsSwiping(false), 50);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    triggerHaptic('delete');
+    setTranslateX(-400);
+    setTimeout(() => {
+      onDelete(item.instanceId);
+    }, 200);
+  };
+
+  return html`
+    <div className="relative mb-3 rounded-[1.8rem] overflow-hidden select-none touch-pan-y">
+      <div className="absolute inset-y-0 right-0 w-24 bg-rose-600/90 rounded-[1.8rem] flex items-center justify-center text-white cursor-pointer active:bg-rose-700 transition-colors" onClick=${handleDelete}>
+        <div className="flex flex-col items-center gap-0.5">
+          <${TrashIcon} size=${20} />
+          <span className="text-[9px] font-black uppercase tracking-wider">Löschen</span>
+        </div>
+      </div>
+      <div
+        style=${{
+          transform: `translateX(${translateX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1)'
+        }}
+        onTouchStart=${handleTouchStart}
+        onTouchMove=${handleTouchMove}
+        onTouchEnd=${handleTouchEnd}
+        onClick=${() => {
+          if (translateX < -10) {
+            setTranslateX(0);
+          } else if (!isSwiping) {
+            triggerHaptic('light');
+            onSelect(item);
+          }
+        }}
+        className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90"
+      >
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
+            ${getItemDisplay(item)}
+          </div>
+          <div className="flex-1 min-w-0 py-0.5">
+            <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
+            <div className="text-[10px] font-black text-slate-500 uppercase truncate">${item.amountDisplay} | ${Math.round(item.calories)} kcal</div>
+          </div>
+        </div>
+        <div className="shrink-0 text-slate-600 pl-2">
+          <${ArrowLeftIcon} size=${14} className="opacity-40" />
+        </div>
+      </div>
+    </div>
+  `;
 };
 
 const AnimatedNumber = ({ value }) => {
@@ -183,8 +345,7 @@ const ProgressRing = React.memo(({
   const excessOffset = circ - excessPercent / 100 * circ;
   const diff = target - consumed;
   return html`<div className="relative flex items-center justify-center">
-      
-      <svg className="relative z-10 transform -rotate-90" height=${radius * 2} width=${radius * 2} className="transform -rotate-90"><circle stroke="#1e293b" strokeWidth=${12} fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/><circle stroke="#8b5cf6" strokeWidth=${12} strokeDasharray=${circ} style=${{
+      <svg className="relative z-10 transform -rotate-90" height=${radius * 2} width=${radius * 2}><circle stroke="#1e293b" strokeWidth=${12} fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/><circle stroke="#8b5cf6" strokeWidth=${12} strokeDasharray=${circ} style=${{
     strokeDashoffset: mainOffset,
     transition: 'stroke-dashoffset 0.8s'
   }} strokeLinecap="round" fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/>${isExceeded && html`<circle stroke="#ef4444" strokeWidth=${12} strokeDasharray=${circ} style=${{
@@ -765,7 +926,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setShowDetails(null);
   };
   const addEntry = useCallback(food => {
-    if (navigator.vibrate) navigator.vibrate(50);
+    triggerHaptic('success');
     const safeAmount = Number(amount) || 0;
     const factor = safeAmount / 100;
     const baseProps = {
@@ -948,12 +1109,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       </div>
       <div className="space-y-6 mb-8">
         <div className="flex items-center gap-4">
-          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation"><${MinusIcon} size=${20}/></button>
+          <button type="button" onClick=${() => { triggerHaptic('light'); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation"><${MinusIcon} size=${20}/></button>
           <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex items-center justify-center gap-2 focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
             <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center text-2xl font-black text-white outline-none w-full max-w-[120px]"/>
             <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
           </div>
-          <button type="button" onClick=${() => { if(navigator.vibrate) navigator.vibrate(20); setAmount((amount || 0) + 50); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation"><${PlusIcon} size=${20}/></button>
+          <button type="button" onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 50); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation"><${PlusIcon} size=${20}/></button>
         </div>
         <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
           <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
@@ -1048,43 +1209,27 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     </div>`}
     ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
   <button onClick=${() => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(d.toISOString().split('T')[0]);
+    triggerHaptic('light');
+    setSelectedDate(addDaysToDateStr(selectedDate, -1));
   }} className="p-1 text-slate-500 hover:text-white active:scale-90 transition-all"><${ArrowLeftIcon} size=${14}/></button>
   <button onClick=${() => {
-    const d = new Date(selectedDate);
-    setCalendarMonth(d.getMonth());
-    setCalendarYear(d.getFullYear());
+    triggerHaptic('light');
+    const curD = parseLocalDate(selectedDate);
+    setCalendarMonth(curD.getMonth());
+    setCalendarYear(curD.getFullYear());
     setShowCalendarModal(true);
   }} className="text-[10px] font-black text-brand-400 uppercase tracking-widest min-w-[70px] text-center bg-brand-500/10 px-3 py-1.5 rounded-full hover:bg-brand-500/20 active:scale-95 transition-all">
-    ${selectedDate === getLocalToday() ? 'Heute, ' : ''}${new Date(selectedDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}
+    ${selectedDate === getLocalToday() ? 'Heute, ' : ''}${parseLocalDate(selectedDate).toLocaleDateString('de-DE', { day: '2-digit', month: 'short' })}
   </button>
   <button onClick=${() => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    setSelectedDate(d.toISOString().split('T')[0]);
+    triggerHaptic('light');
+    setSelectedDate(addDaysToDateStr(selectedDate, 1));
   }} className="p-1 text-slate-500 hover:text-white active:scale-90 transition-all"><${ArrowRightIcon} size=${14}/></button>
-</div></div><div className="flex gap-2"><button onClick=${() => setShowAiCoach(true)} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400"><${SparklesIcon} size=${20}/></button><button onClick=${() => setView('profile')} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪🏼 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 Zucker" value=${totals.s} color="text-blue-600 dark:text-blue-500" valueSuffix=${totals.s >= 50 ? "⚠️" : null} animate=${totals.s >= 50}/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="🧈 gesättigt" value=${totals.sf} color="text-amber-600"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-amber-200"/></div></div></div></div>
-<button onClick=${() => { if(navigator.vibrate) navigator.vibrate(50); setView('addFood'); }} className="fixed bottom-6 right-6 z-[100] w-16 h-16 bg-brand-500 text-slate-950 rounded-[2rem] flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.4)] active:scale-90 transition-all border border-brand-400">
+</div></div><div className="flex gap-2"><button onClick=${() => { triggerHaptic('light'); setShowAiCoach(true); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400"><${SparklesIcon} size=${20}/></button><button onClick=${() => { triggerHaptic('light'); setView('profile'); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪🏼 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 Zucker" value=${totals.s} color="text-blue-600 dark:text-blue-500" valueSuffix=${totals.s >= 50 ? "⚠️" : null} animate=${totals.s >= 50}/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="🧈 gesättigt" value=${totals.sf} color="text-amber-600"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-amber-200"/></div></div></div></div>
+<button onClick=${() => { triggerHaptic('light'); setView('addFood'); }} className="fixed bottom-6 right-6 z-[100] w-16 h-16 bg-brand-500 text-slate-950 rounded-[2rem] flex items-center justify-center shadow-[0_0_30px_rgba(139,92,246,0.4)] active:scale-90 transition-all border border-brand-400">
     <${PlusIcon} size=${30} strokeWidth=${3} />
 </button>
-<div className="space-y-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-4">📅 Tagebuch</h3><div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<div key=${item.instanceId} onClick=${() => setShowDetails(item)} className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center active:scale-[0.98] transition-transform duration-150 cursor-pointer mb-3 overflow-hidden">
-    <div className="flex items-center gap-4 min-w-0 flex-1 mr-2">
-        <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
-            ${getItemDisplay(item)}
-        </div>
-        <div className="flex-1 min-w-0 py-0.5">
-            <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-            <div className="text-[10px] font-black text-slate-500 uppercase truncate">${item.amountDisplay} | ${Math.round(item.calories)} kcal</div>
-        </div>
-    </div>
-    <button onClick=${e => {
-        e.stopPropagation();
-        if (navigator.vibrate) navigator.vibrate(50);
-        setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== item.instanceId)}));
-    }} className="shrink-0 ml-2 p-3 text-slate-700 hover:text-rose-500 transition-all"><${TrashIcon} size=${20}/></button>
-</div>`)}</div></div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => {
+<div className="space-y-4"><h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em] px-4">📅 Tagebuch</h3><div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => setShowDetails(selected)} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div></div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => {
     setView('dashboard');
     setApiResults([]);
   }} className="p-4 glass-card rounded-2xl"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-5 mb-10"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-5 pr-14 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner"/><button onClick=${() => triggerSearch()} className="absolute right-3 top-1/2 -translate-y-1/2 p-3 text-slate-500 hover:text-brand-400 active:scale-90 transition-all"><${SearchIcon} size=${20}/></button></div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="flex gap-3"><button onClick=${handleAiTextClick} disabled=${isThinking} className="flex-1 bg-slate-900 border border-white/10 py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:bg-slate-800 transition-colors">${isThinking ? html`<${LoaderIcon} size=${14}/>` : html`<${SparklesIcon} size=${14} className="text-brand-400"/>`} AI Text</button><button onClick=${() => aiFileRef.current.click()} disabled=${isThinking} className="flex-1 bg-slate-900 border border-white/10 py-4 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-2 active:bg-slate-800 transition-colors"><${CameraIcon} size=${16}/> AI Foto</button><button onClick=${() => {
@@ -1312,11 +1457,12 @@ ${showCalendarModal && (() => {
           
           return html`
             <button key=${dateStr} onClick=${() => {
+              triggerHaptic('light');
               setSelectedDate(dateStr);
               setShowCalendarModal(false);
             }} className=${baseClass}>
-              ${day}
-              ${isToday && !isSelected ? html`<div className="w-1 h-1 bg-white rounded-full mt-0.5 absolute bottom-1.5"/>` : ''}
+              <span>${day}</span>
+              ${isToday && html`<span className="absolute bottom-1 w-1 h-1 rounded-full bg-current"/>`}
             </button>
           `;
         })}
