@@ -1081,11 +1081,15 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
   };
 
   const saveActivity = (customDraft = null) => {
-    const draft = customDraft || activityDraft;
-    if (!draft || !draft.name) return;
+    // Safely check if customDraft is an explicit activity object and not a click event
+    const isExplicitDraft = customDraft && typeof customDraft === 'object' && !customDraft.nativeEvent && !customDraft._reactName && typeof customDraft.stopPropagation !== 'function';
+    const draft = isExplicitDraft ? customDraft : activityDraft;
+    if (!draft) return;
+    
+    const actName = (draft.name || activityInput || 'Aktivität').trim();
+    if (!actName) return alert("Bitte gib der Aktivität einen Namen.");
     const burnedKcal = Number(draft.burnedCalories) || 0;
     const durationMins = Number(draft.durationMinutes) || 0;
-    const actName = draft.name.trim();
 
     const newActivity = {
       instanceId: editingInstanceId || generateId(),
@@ -2279,7 +2283,7 @@ ${showActivityModal && html`
         <div className="flex flex-col gap-2.5">
           <button
             type="button"
-            onClick=${saveActivity}
+            onClick=${() => saveActivity()}
             className="w-full py-5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl shadow-amber-500/20 flex items-center justify-center gap-2"
           >
             <${CheckIcon} size=${20}/> Aktivität eintragen
