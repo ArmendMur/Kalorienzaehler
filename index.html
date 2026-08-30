@@ -266,8 +266,9 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
     const diffY = e.touches[0].clientY - startY.current;
 
     if (isHorizontal.current === null) {
-      if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
-        isHorizontal.current = Math.abs(diffX) > Math.abs(diffY);
+      if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+        // Only lock into horizontal swipe when horizontal intent is distinct
+        isHorizontal.current = Math.abs(diffX) > Math.abs(diffY) * 1.25;
       }
     }
 
@@ -323,10 +324,16 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
     }
   };
 
+  const deleteOpacity = isDeleting ? 1 : Math.min(1, Math.max(0, Math.abs(translateX) / 35));
+
   return html`
     <div className=${`relative mb-3 rounded-[1.8rem] overflow-hidden select-none touch-pan-y transition-all duration-300 ${isDeleting ? 'max-h-0 opacity-0 mb-0 pointer-events-none' : 'max-h-40 opacity-100'} ${className}`}>
       <div 
-        className="absolute inset-y-0 right-0 w-full bg-gradient-to-l from-rose-600 via-rose-600 to-rose-700/80 rounded-[1.8rem] flex items-center justify-end px-6 cursor-pointer active:brightness-90 transition-colors"
+        className="absolute inset-y-0 right-0 w-full bg-gradient-to-l from-rose-600 via-rose-600 to-rose-700/80 rounded-[1.8rem] flex items-center justify-end px-6 cursor-pointer active:brightness-90 transition-opacity duration-150"
+        style=${{
+          opacity: deleteOpacity,
+          pointerEvents: translateX < -20 ? 'auto' : 'none'
+        }}
         onClick=${(e) => { e.stopPropagation(); triggerDelete(); }}
       >
         <div 
@@ -358,8 +365,8 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
   `;
 };
 
-const SwipeableLogItem = ({ item, onSelect, onDelete }) => html`
-  <${SwipeableItem} onSelect=${() => !item.isActivity && onSelect(item)} onDelete=${() => onDelete(item.instanceId)}>
+const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => html`
+  <${SwipeableItem} onSelect=${() => item.isActivity ? (onSelectActivity && onSelectActivity(item)) : (onSelect && onSelect(item))} onDelete=${() => onDelete(item.instanceId)}>
     <div className=${`glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 ${item.isActivity ? 'bg-slate-900/95 border border-amber-500/25 shadow-[0_0_15px_rgba(245,158,11,0.08)]' : 'bg-slate-900/90'}`}>
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <div className=${`shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl flex items-center justify-center text-xl shadow-inner border ${item.isActivity ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-slate-800/50 border-white/5'}`}>
@@ -406,39 +413,146 @@ const ProgressRing = React.memo(({
   burned = 0,
   target
 }) => {
-  const radius = 80;
-  const normRadius = radius - 12;
+  const baseTarget = Number(target) || 2000;
+  const burnedKcal = Math.max(0, Number(burned) || 0);
+  const consumedKcal = Math.max(0, Number(consumed) || 0);
+  const effectiveTarget = baseTarget + burnedKcal;
+
+  const radius = 88;
+  const strokeW = 12;
+  const normRadius = radius - strokeW;
   const circ = normRadius * 2 * Math.PI;
-  const rawPercent = consumed / (target || 1) * 100 || 0;
-  let glowColor = "rgba(139, 92, 246, 0.3)";
-  if (rawPercent > 85) glowColor = "rgba(245, 158, 11, 0.4)";
-  if (rawPercent > 100) glowColor = "rgba(239, 68, 68, 0.5)";
-  const isExceeded = consumed > target;
-  const mainPercent = Math.min(rawPercent, 100);
-  const mainOffset = circ - mainPercent / 100 * circ;
-  const excessPercent = isExceeded ? Math.min(rawPercent - 100, 100) : 0;
-  const excessOffset = circ - excessPercent / 100 * circ;
-  const diff = target - consumed;
-  const netKcal = Math.max(0, consumed - burned);
+
+  const baseRatio = effectiveTarget > 0 ? (baseTarget / effectiveTarget) : 1;
+  const sportRatio = effectiveTarget > 0 ? (burnedKcal / effectiveTarget) : 0;
+
+  const rawConsumedPercent = effectiveTarget > 0 ? (consumedKcal / effectiveTarget) * 100 : 0;
+  const mainPercent = Math.min(rawConsumedPercent, 100);
+  const mainOffset = circ - (mainPercent / 100) * circ;
+
+  const isExceededEffective = consumedKcal > effectiveTarget;
+  const excessEffectivePercent = isExceededEffective ? Math.min(((consumedKcal - effectiveTarget) / effectiveTarget) * 100, 100) : 0;
+  const excessOffset = circ - (excessEffectivePercent / 100) * circ;
+
+  const sportArcLength = sportRatio * circ;
+  const sportArcOffset = -(baseRatio * circ);
+
+  const diffWithSport = effectiveTarget - consumedKcal;
+  const diffWithoutSport = baseTarget - consumedKcal;
+
+  const markerAngle = (baseRatio * 2 * Math.PI) - (Math.PI / 2);
+  const mx1 = radius + (normRadius - strokeW / 2 - 2) * Math.cos(markerAngle);
+  const my1 = radius + (normRadius - strokeW / 2 - 2) * Math.sin(markerAngle);
+  const mx2 = radius + (normRadius + strokeW / 2 + 2) * Math.cos(markerAngle);
+  const my2 = radius + (normRadius + strokeW / 2 + 2) * Math.sin(markerAngle);
+
+  const isOverWithoutSport = diffWithoutSport < 0;
 
   return html`<div className="relative flex flex-col items-center justify-center">
       <div className="relative flex items-center justify-center">
-        <svg className="relative z-10 transform -rotate-90" height=${radius * 2} width=${radius * 2}><circle stroke="#1e293b" strokeWidth=${12} fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/><circle stroke="#8b5cf6" strokeWidth=${12} strokeDasharray=${circ} style=${{
-      strokeDashoffset: mainOffset,
-      transition: 'stroke-dashoffset 0.8s'
-    }} strokeLinecap="round" fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/>${isExceeded && html`<circle stroke="#ef4444" strokeWidth=${12} strokeDasharray=${circ} style=${{
-      strokeDashoffset: excessOffset,
-      transition: 'stroke-dashoffset 0.8s'
-    }} strokeLinecap="round" fill="transparent" r=${normRadius} cx=${radius} cy=${radius}/>`}</svg><div className="absolute text-center"><div className=${`text-3xl font-black tracking-tighter ${isExceeded ? 'text-rose-500' : 'text-white'}`}><${AnimatedNumber} value=${Math.round(consumed)} /></div><div className=${`text-[9px] font-black uppercase tracking-widest ${diff < 0 ? 'text-rose-500' : 'text-slate-500'}`}>${diff < 0 ? `${Math.abs(Math.round(diff))} kcal drüber` : `${Math.round(diff)} kcal übrig`}</div></div>
-      </div>
-      ${burned > 0 && html`
-        <div className="flex items-center gap-2.5 mt-4 px-3.5 py-1.5 bg-slate-900/80 rounded-2xl border border-white/5 text-[10px] font-bold">
-          <span className="text-slate-400">🔥 ${Math.round(consumed)}</span>
-          <span className="text-amber-400 font-black">⚡ -${Math.round(burned)}</span>
-          <span className="text-slate-600 font-normal">|</span>
-          <span className="text-brand-300 font-black">= ${Math.round(netKcal)} Netto</span>
+        <svg className="relative z-10 transform -rotate-90" height=${radius * 2} width=${radius * 2}>
+          <circle
+            stroke="#1e293b"
+            strokeWidth=${strokeW}
+            fill="transparent"
+            r=${normRadius}
+            cx=${radius}
+            cy=${radius}
+          />
+          ${burnedKcal > 0 && html`
+            <circle
+              stroke="#f59e0b"
+              strokeWidth=${strokeW}
+              strokeDasharray="${sportArcLength} ${circ}"
+              style=${{
+                strokeDashoffset: sportArcOffset,
+                transition: 'all 0.8s ease-out',
+                opacity: 0.4
+              }}
+              strokeLinecap="butt"
+              fill="transparent"
+              r=${normRadius}
+              cx=${radius}
+              cy=${radius}
+            />
+          `}
+          <circle
+            stroke="#8b5cf6"
+            strokeWidth=${strokeW}
+            strokeDasharray=${circ}
+            style=${{
+              strokeDashoffset: mainOffset,
+              transition: 'stroke-dashoffset 0.8s ease-out'
+            }}
+            strokeLinecap="round"
+            fill="transparent"
+            r=${normRadius}
+            cx=${radius}
+            cy=${radius}
+          />
+          ${isExceededEffective && html`
+            <circle
+              stroke="#ef4444"
+              strokeWidth=${strokeW}
+              strokeDasharray=${circ}
+              style=${{
+                strokeDashoffset: excessOffset,
+                transition: 'stroke-dashoffset 0.8s ease-out'
+              }}
+              strokeLinecap="round"
+              fill="transparent"
+              r=${normRadius}
+              cx=${radius}
+              cy=${radius}
+            />
+          `}
+          ${burnedKcal > 0 && html`
+            <line
+              x1=${mx1}
+              y1=${my1}
+              x2=${mx2}
+              y2=${my2}
+              stroke="#f59e0b"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+          `}
+        </svg>
+
+        <div className="absolute text-center flex flex-col items-center justify-center px-4 max-w-[130px]">
+          <div className=${`text-3xl font-black tracking-tighter leading-none ${isExceededEffective ? 'text-rose-500' : 'text-white'}`}>
+            <${AnimatedNumber} value=${Math.round(consumedKcal)} />
+          </div>
+          <div className="text-[8px] font-black uppercase text-slate-500 tracking-wider mt-0.5">kcal gegessen</div>
+
+          <div className=${`text-[9px] font-black uppercase tracking-wider mt-1 ${diffWithSport < 0 ? 'text-rose-500' : burnedKcal > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
+            ${diffWithSport < 0 ? `${Math.abs(Math.round(diffWithSport))} kcal drüber` : `${Math.round(diffWithSport)} kcal übrig`}
+          </div>
+
+          ${burnedKcal > 0 && html`
+            <div className=${`text-[8px] font-bold tracking-tight px-1.5 py-0.5 rounded-md mt-1 border leading-tight ${
+              isOverWithoutSport 
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
+                : 'bg-slate-800/80 text-slate-400 border-white/5'
+            }`}>
+              Ohne Sport: ${diffWithoutSport < 0 ? `${Math.abs(Math.round(diffWithoutSport))} drüber` : `${Math.round(diffWithoutSport)} übrig`}
+            </div>
+          `}
         </div>
-      `}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 mt-4 px-3.5 py-2 bg-slate-900/90 rounded-2xl border border-white/5 text-[10px] font-bold shadow-inner">
+        <span className="text-slate-300 flex items-center gap-1">🔥 ${Math.round(consumedKcal)} <span className="text-[9px] font-normal text-slate-500">gegessen</span></span>
+        ${burnedKcal > 0 ? html`
+          <span className="text-slate-600">|</span>
+          <span className="text-amber-400 flex items-center gap-1">⚡ +${Math.round(burnedKcal)} <span className="text-[9px] font-normal text-amber-400/80">Sport</span></span>
+          <span className="text-slate-600">|</span>
+          <span className="text-brand-300 flex items-center gap-1">🎯 ${Math.round(effectiveTarget)} <span className="text-[9px] font-normal text-brand-300/80">Ziel</span> <span className="text-[8px] text-slate-500 font-normal">(${baseTarget} Basis)</span></span>
+        ` : html`
+          <span className="text-slate-600">|</span>
+          <span className="text-brand-300 flex items-center gap-1">🎯 ${baseTarget} <span className="text-[9px] font-normal text-brand-300/80">Ziel</span></span>
+        `}
+      </div>
     </div>`;
 });
 const MacroBar = ({
@@ -574,6 +688,50 @@ function App() {
   const [activityDraft, setActivityDraft] = useState(null);
   const [activityStep, setActivityStep] = useState('input');
 
+  const [activityHistory, setActivityHistory] = useState(() => {
+    const savedRaw = localStorage.getItem('kTrackActivityHistory');
+    if (savedRaw && savedRaw !== "null") {
+      try {
+        const parsed = JSON.parse(savedRaw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch(e) {}
+    }
+    // Extract existing activities from allLogs if any
+    const extracted = [];
+    try {
+      const allLogsRaw = localStorage.getItem('kTrackAllLogs');
+      if (allLogsRaw && allLogsRaw !== "null") {
+        const logs = JSON.parse(allLogsRaw);
+        for (const d in logs) {
+          if (logs[d]?.items) {
+            for (const it of logs[d].items) {
+              if (it.isActivity && !extracted.find(x => x.name.toLowerCase() === it.name.toLowerCase())) {
+                extracted.push({
+                  id: generateId(),
+                  name: it.name,
+                  emoji: it.emoji || '⚡',
+                  durationMinutes: Number(it.durationMinutes) || 30,
+                  burnedCalories: Number(it.burnedCalories) || 200,
+                  count: 1
+                });
+              }
+            }
+          }
+        }
+      }
+    } catch(e) {}
+    if (extracted.length > 0) return extracted;
+
+    return [
+      { id: 'def-1', name: '45 Min Krafttraining', emoji: '🏋️‍♂️', durationMinutes: 45, burnedCalories: 280, count: 1 },
+      { id: 'def-2', name: '30 Min Joggen (5km)', emoji: '🏃', durationMinutes: 30, burnedCalories: 300, count: 1 },
+      { id: 'def-3', name: '1 Std. Radfahren', emoji: '🚴', durationMinutes: 60, burnedCalories: 400, count: 1 },
+      { id: 'def-4', name: '1 Std. Spaziergang', emoji: '🚶', durationMinutes: 60, burnedCalories: 180, count: 1 },
+      { id: 'def-5', name: '30 Min HIIT Cardio', emoji: '⚡', durationMinutes: 30, burnedCalories: 260, count: 1 },
+      { id: 'def-6', name: '45 Min Schwimmen', emoji: '🏊', durationMinutes: 45, burnedCalories: 350, count: 1 }
+    ];
+  });
+
   const [isTorchOn, setIsTorchOn] = useState(false);
 
   useEffect(() => {
@@ -597,6 +755,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('kTrackHistory', JSON.stringify(itemHistory));
   }, [itemHistory]);
+  useEffect(() => {
+    localStorage.setItem('kTrackActivityHistory', JSON.stringify(activityHistory));
+  }, [activityHistory]);
+
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [apiResults, setApiResults] = useState([]);
@@ -611,6 +773,13 @@ function App() {
   const [aiDesc, setAiDesc] = useState('');
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('Gespeichert!');
+
+  const triggerSuccessToast = (msg = 'Gespeichert!') => {
+    setSuccessMessage(msg);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 1600);
+  };
   const [swipeId, setSwipeId] = useState(null);
   const aiFileRef = useRef();
   const qrInstance = useRef(null);
@@ -761,6 +930,7 @@ function App() {
     setRecipes(prev => [finalRecipe, ...(Array.isArray(prev) ? prev.filter(r => r.id !== finalRecipe.id) : [])]);
     setShowRecipeModal(false);
     triggerHaptic('success');
+    triggerSuccessToast('🥗 Rezept gespeichert!');
   };
   useEffect(() => {
     if (searchQuery.trim().length < 1) {
@@ -910,15 +1080,20 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
     }
   };
 
-  const saveActivity = () => {
-    if (!activityDraft || !activityDraft.name) return;
+  const saveActivity = (customDraft = null) => {
+    const draft = customDraft || activityDraft;
+    if (!draft || !draft.name) return;
+    const burnedKcal = Number(draft.burnedCalories) || 0;
+    const durationMins = Number(draft.durationMinutes) || 0;
+    const actName = draft.name.trim();
+
     const newActivity = {
-      instanceId: generateId(),
+      instanceId: editingInstanceId || generateId(),
       isActivity: true,
-      name: activityDraft.name,
-      emoji: activityDraft.emoji || '⚡',
-      burnedCalories: Number(activityDraft.burnedCalories) || 0,
-      durationMinutes: Number(activityDraft.durationMinutes) || 0,
+      name: actName,
+      emoji: draft.emoji || '⚡',
+      burnedCalories: burnedKcal,
+      durationMinutes: durationMins,
       calories: 0,
       protein: 0,
       carbs: 0,
@@ -928,16 +1103,41 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
       timestamp: Date.now()
     };
 
-    setDailyLog(prev => ({
-      ...prev,
-      items: [...(Array.isArray(prev.items) ? prev.items : []), newActivity]
-    }));
+    if (editingInstanceId) {
+      setDailyLog(prev => ({
+        ...prev,
+        items: (prev.items || []).map(i => i.instanceId === editingInstanceId ? newActivity : i)
+      }));
+    } else {
+      setDailyLog(prev => ({
+        ...prev,
+        items: [...(Array.isArray(prev.items) ? prev.items : []), newActivity]
+      }));
+    }
+
+    setActivityHistory(prev => {
+      const safePrev = Array.isArray(prev) ? prev : [];
+      const filtered = safePrev.filter(a => a?.name?.toLowerCase() !== actName.toLowerCase());
+      const existing = safePrev.find(a => a?.name?.toLowerCase() === actName.toLowerCase());
+      return [{
+        id: generateId(),
+        name: actName,
+        emoji: draft.emoji || '⚡',
+        durationMinutes: durationMins,
+        burnedCalories: burnedKcal,
+        count: (existing?.count || 0) + 1,
+        lastUsed: Date.now()
+      }, ...filtered].slice(0, 30);
+    });
 
     setShowActivityModal(false);
     setActivityDraft(null);
     setActivityInput('');
     setActivityStep('input');
+    setEditingInstanceId(null);
     triggerHaptic('success');
+    triggerSuccessToast('⚡ Aktivität eingetragen!');
+    if (view === 'addFood') setView('dashboard');
   };
 
   const calculateGoalsViaAi = async () => {
@@ -1342,8 +1542,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         }, ...filtered].slice(0, 50);
       });
     }
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 1500);
+    triggerSuccessToast('Gespeichert!');
     setView('dashboard');
     setSearchQuery('');
     setApiResults([]);
@@ -1352,7 +1551,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setAmount(100);
   }, [amount, editingInstanceId, setDailyLog, setItemHistory]);
   return html`<div className="max-w-md mx-auto min-h-screen bg-slate-950 text-slate-100 px-6 pb-24 pt-[env(safe-area-inset-top,2.5rem)] relative overflow-hidden">
-    ${showSuccess && html`<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[300] bg-brand-500 text-slate-950 px-8 py-4 rounded-full font-black flex items-center gap-3 shadow-2xl animate-success-fade"><${CheckIcon} size=${24}/> Gespeichert!</div>`}
+    ${showSuccess && html`<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[500] bg-brand-500 text-slate-950 px-8 py-4 rounded-full font-black flex items-center gap-3 shadow-2xl animate-success-fade"><${CheckIcon} size=${24} strokeWidth=${3}/> ${successMessage}</div>`}
     ${showDetails && html`<div className="fixed inset-0 bg-slate-950/95 z-[200] flex items-center justify-center p-6 backdrop-blur-xl animate-in zoom-in duration-200">
       <div className="w-full glass-card rounded-[3rem] p-5 sm:p-6 space-y-6 overscroll-contain">
         <div>
@@ -1622,11 +1821,22 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 <div className="space-y-4">
   <div className="flex justify-between items-center px-4">
     <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">📅 Tagebuch</h3>
-    <button onClick=${() => { triggerHaptic('light'); setShowActivityModal(true); setActivityStep('input'); }} className="text-[9px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 hover:bg-amber-500/20 active:scale-95 transition-all flex items-center gap-1">
+    <button onClick=${() => { triggerHaptic('light'); setEditingInstanceId(null); setActivityDraft(null); setShowActivityModal(true); setActivityStep('input'); }} className="text-[9px] font-black uppercase tracking-wider text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20 hover:bg-amber-500/20 active:scale-95 transition-all flex items-center gap-1">
       <${ZapIcon} size=${11}/> + Aktivität
     </button>
   </div>
-  <div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => setShowDetails(selected)} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div>
+  <div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => setShowDetails(selected)} onSelectActivity=${(act) => {
+    setActivityDraft({
+      name: act.name,
+      emoji: act.emoji || '⚡',
+      durationMinutes: act.durationMinutes || 30,
+      burnedCalories: act.burnedCalories || act.calories || 200,
+      explanation: act.explanation || ''
+    });
+    setEditingInstanceId(act.instanceId);
+    setActivityStep('preview');
+    setShowActivityModal(true);
+  }} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div>
 </div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => {
     setView('dashboard');
     setApiResults([]);
@@ -1911,7 +2121,7 @@ ${showActivityModal && html`
             placeholder="z.B. 45 Min intensives Krafttraining Oberkörper, 30 Min Joggen (5km), 1 Std. Radfahren, 4000 Schritte Spaziergang..."
             value=${activityInput}
             onChange=${e => setActivityInput(e.target.value)}
-            className="w-full p-4 bg-slate-900 border border-white/10 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none text-xs sm:text-sm font-medium text-white shadow-inner h-28 resize-none"
+            className="w-full p-4 bg-slate-900 border border-white/10 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none text-xs sm:text-sm font-medium text-white shadow-inner h-24 resize-none"
           />
         </div>
 
@@ -1939,10 +2149,73 @@ ${showActivityModal && html`
           type="button"
           onClick=${() => calculateActivityViaAi(activityInput)}
           disabled=${isActivityLoading}
-          className="w-full py-5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-amber-500/20"
+          className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-lg shadow-amber-500/20 text-xs"
         >
-          ${isActivityLoading ? html`<${LoaderIcon} size=${20}/> Berechne...` : html`<${SparklesIcon} size=${20}/> Kalorien via KI schätzen`}
+          ${isActivityLoading ? html`<${LoaderIcon} size=${18}/> Berechne...` : html`<${SparklesIcon} size=${18}/> Kalorien via KI schätzen`}
         </button>
+
+        <div className="space-y-2 pt-2 border-t border-white/10">
+          <div className="flex justify-between items-center px-1">
+            <span className="text-[10px] font-black text-amber-400 uppercase tracking-widest block">
+              ⚡ Vorschläge & Letzte Aktivitäten
+            </span>
+            <span className="text-[9px] font-bold text-slate-500">${activityHistory.length} gemerkt</span>
+          </div>
+
+          <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+            ${activityHistory.map(act => html`
+              <div
+                key=${act.id || act.name}
+                onClick=${() => {
+                  triggerHaptic('light');
+                  setActivityDraft({
+                    name: act.name,
+                    emoji: act.emoji || '⚡',
+                    durationMinutes: Number(act.durationMinutes) || 30,
+                    burnedCalories: Number(act.burnedCalories) || 200,
+                    explanation: 'Aus deinem Verlauf übernommen'
+                  });
+                  setActivityStep('preview');
+                }}
+                className="p-3 bg-slate-900/80 hover:bg-slate-900 border border-white/5 hover:border-amber-500/30 rounded-2xl flex items-center justify-between gap-3 cursor-pointer active:scale-[0.98] transition-all shadow-sm"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-xl text-amber-400 shadow-inner">
+                    ${act.emoji || '⚡'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-xs text-white truncate">${act.name}</div>
+                    <div className="text-[10px] font-black text-amber-400 mt-0.5">
+                      ${act.durationMinutes ? `${act.durationMinutes} Min | ` : ''}⚡ -${act.burnedCalories || 0} kcal
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0" onClick=${e => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick=${() => saveActivity(act)}
+                    className="p-2 bg-amber-500/20 hover:bg-amber-500 text-amber-400 hover:text-slate-950 rounded-xl border border-amber-500/30 active:scale-90 transition-all"
+                    title="Direkt eintragen"
+                  >
+                    <${PlusIcon} size=${16}/>
+                  </button>
+                  <button
+                    type="button"
+                    onClick=${() => {
+                      triggerHaptic('delete');
+                      setActivityHistory(prev => (Array.isArray(prev) ? prev : []).filter(a => a.name !== act.name));
+                    }}
+                    className="p-2 text-slate-600 hover:text-rose-400 active:scale-90 transition-colors"
+                    title="Entfernen"
+                  >
+                    <${TrashIcon} size=${14}/>
+                  </button>
+                </div>
+              </div>
+            `)}
+          </div>
+        </div>
       </div>
     ` : html`
       <div className="space-y-5 animate-in zoom-in duration-200">
@@ -2112,6 +2385,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
         user: JSON.parse(localStorage.getItem('kTrackUser') || '{}'),
         aiGoalForm: JSON.parse(localStorage.getItem('kTrackAiGoalForm') || '{}'),
         history: JSON.parse(localStorage.getItem('kTrackHistory') || '[]'),
+        activityHistory: JSON.parse(localStorage.getItem('kTrackActivityHistory') || '[]'),
         logs: JSON.parse(localStorage.getItem('kTrackAllLogs') || '{}'),
         recipes: JSON.parse(localStorage.getItem('kTrackRecipes') || '[]'),
       };
@@ -2139,6 +2413,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
           if (data.user) localStorage.setItem('kTrackUser', JSON.stringify(data.user));
           if (data.aiGoalForm) localStorage.setItem('kTrackAiGoalForm', JSON.stringify(data.aiGoalForm));
           if (data.history) localStorage.setItem('kTrackHistory', JSON.stringify(data.history));
+          if (data.activityHistory) localStorage.setItem('kTrackActivityHistory', JSON.stringify(data.activityHistory));
           if (data.logs) localStorage.setItem('kTrackAllLogs', JSON.stringify(data.logs));
           if (data.recipes) localStorage.setItem('kTrackRecipes', JSON.stringify(data.recipes));
           alert("Erfolgreich importiert!");
