@@ -440,11 +440,12 @@ const ProgressRing = React.memo(({
   const diffWithSport = effectiveTarget - consumedKcal;
   const diffWithoutSport = baseTarget - consumedKcal;
 
-  const markerAngle = (baseRatio * 2 * Math.PI) - (Math.PI / 2);
-  const mx1 = radius + (normRadius - strokeW / 2 - 2) * Math.cos(markerAngle);
-  const my1 = radius + (normRadius - strokeW / 2 - 2) * Math.sin(markerAngle);
-  const mx2 = radius + (normRadius + strokeW / 2 + 2) * Math.cos(markerAngle);
-  const my2 = radius + (normRadius + strokeW / 2 + 2) * Math.sin(markerAngle);
+  // The SVG is rotated -90deg, so 0 is top (12 o'clock) and baseRatio * 2 * PI is the exact clockwise angle
+  const markerAngle = baseRatio * 2 * Math.PI;
+  const mx1 = radius + (normRadius - strokeW / 2 - 3) * Math.cos(markerAngle);
+  const my1 = radius + (normRadius - strokeW / 2 - 3) * Math.sin(markerAngle);
+  const mx2 = radius + (normRadius + strokeW / 2 + 3) * Math.cos(markerAngle);
+  const my2 = radius + (normRadius + strokeW / 2 + 3) * Math.sin(markerAngle);
 
   const isOverWithoutSport = diffWithoutSport < 0;
 
@@ -467,7 +468,7 @@ const ProgressRing = React.memo(({
               style=${{
                 strokeDashoffset: sportArcOffset,
                 transition: 'all 0.8s ease-out',
-                opacity: 0.4
+                opacity: 0.35
               }}
               strokeLinecap="butt"
               fill="transparent"
@@ -513,8 +514,9 @@ const ProgressRing = React.memo(({
               x2=${mx2}
               y2=${my2}
               stroke="#f59e0b"
-              strokeWidth="2.5"
+              strokeWidth="3.5"
               strokeLinecap="round"
+              style=${{ filter: 'drop-shadow(0 0 4px rgba(245, 158, 11, 0.8))' }}
             />
           `}
         </svg>
@@ -530,10 +532,8 @@ const ProgressRing = React.memo(({
           </div>
 
           ${burnedKcal > 0 && html`
-            <div className=${`text-[8px] font-bold tracking-tight px-1.5 py-0.5 rounded-md mt-1 border leading-tight ${
-              isOverWithoutSport 
-                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' 
-                : 'bg-slate-800/80 text-slate-400 border-white/5'
+            <div className=${`text-[9px] font-bold tracking-tight mt-0.5 ${
+              isOverWithoutSport ? 'text-amber-400' : 'text-slate-500'
             }`}>
               Ohne Sport: ${diffWithoutSport < 0 ? `${Math.abs(Math.round(diffWithoutSport))} drüber` : `${Math.round(diffWithoutSport)} übrig`}
             </div>
@@ -1895,7 +1895,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                   </div>
                   <div className="flex-1 min-w-0 py-0.5">
                     <div className="font-bold text-sm text-white break-words leading-snug">${rec.name}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${rec.totalCalories || rec.calories} kcal ${rec.servings > 1 ? `(${rec.servings} Port.)` : ''} | P: ${rec.totalProtein || rec.protein}g C: ${rec.totalCarbs || rec.carbs}g F: ${rec.totalFat || rec.fat}g</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${rec.totalWeight || rec.pieceWeight || 100}g | ${rec.totalCalories || rec.calories} kcal</div>
                   </div>
                 </div>
                 <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
@@ -2127,26 +2127,6 @@ ${showActivityModal && html`
             onChange=${e => setActivityInput(e.target.value)}
             className="w-full p-4 bg-slate-900 border border-white/10 rounded-2xl focus:ring-2 focus:ring-amber-500 outline-none text-xs sm:text-sm font-medium text-white shadow-inner h-24 resize-none"
           />
-        </div>
-
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-          ${[
-            "45 Min Krafttraining",
-            "30 Min Joggen (5km)",
-            "1 Std. Radfahren",
-            "30 Min HIIT Cardio",
-            "1 Std. Spaziergang",
-            "45 Min Schwimmen"
-          ].map(shortcut => html`
-            <button
-              key=${shortcut}
-              type="button"
-              onClick=${() => setActivityInput(shortcut)}
-              className="shrink-0 px-3 py-1.5 bg-slate-900 border border-white/10 rounded-xl text-[10px] font-bold text-slate-300 hover:text-white active:scale-95 transition-all"
-            >
-              + ${shortcut}
-            </button>
-          `)}
         </div>
 
         <button
