@@ -443,28 +443,58 @@ const ProgressRing = React.memo(({
   const baseTarget = Number(target) || 2000;
   const burnedKcal = Math.max(0, Number(burned) || 0);
   const consumedKcal = Math.max(0, Number(consumed) || 0);
-  const effectiveTarget = baseTarget + burnedKcal;
 
+  // Synchronized 60fps state animation for smooth simultaneous ring growth
+  const [animConsumed, setAnimConsumed] = useState(0);
+  const [animBurned, setAnimBurned] = useState(0);
+
+  useEffect(() => {
+    let startC = animConsumed;
+    let endC = consumedKcal;
+    let startB = animBurned;
+    let endB = burnedKcal;
+    let duration = 850;
+    let startTimestamp = null;
+
+    const step = (timestamp) => {
+      if (!startTimestamp) startTimestamp = timestamp;
+      const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      // Silky smooth cubic ease-out
+      const ease = 1 - Math.pow(1 - progress, 3);
+      setAnimConsumed(startC + (endC - startC) * ease);
+      setAnimBurned(startB + (endB - startB) * ease);
+
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      } else {
+        setAnimConsumed(endC);
+        setAnimBurned(endB);
+      }
+    };
+    window.requestAnimationFrame(step);
+  }, [consumedKcal, burnedKcal]);
+
+  const effectiveTarget = baseTarget + animBurned;
   const radius = 88;
   const strokeW = 12;
   const normRadius = radius - strokeW;
   const circ = normRadius * 2 * Math.PI;
 
   const baseRatio = effectiveTarget > 0 ? (baseTarget / effectiveTarget) : 1;
-  const sportRatio = effectiveTarget > 0 ? (burnedKcal / effectiveTarget) : 0;
+  const sportRatio = effectiveTarget > 0 ? (animBurned / effectiveTarget) : 0;
 
-  const rawConsumedPercent = effectiveTarget > 0 ? (consumedKcal / effectiveTarget) * 100 : 0;
+  const rawConsumedPercent = effectiveTarget > 0 ? (animConsumed / effectiveTarget) * 100 : 0;
   const mainPercent = Math.min(rawConsumedPercent, 100);
   const mainOffset = circ - (mainPercent / 100) * circ;
 
-  const isExceededEffective = consumedKcal > effectiveTarget;
-  const excessEffectivePercent = isExceededEffective ? Math.min(((consumedKcal - effectiveTarget) / effectiveTarget) * 100, 100) : 0;
+  const isExceededEffective = animConsumed > effectiveTarget;
+  const excessEffectivePercent = isExceededEffective ? Math.min(((animConsumed - effectiveTarget) / effectiveTarget) * 100, 100) : 0;
   const excessOffset = circ - (excessEffectivePercent / 100) * circ;
 
-  const sportArcLength = sportRatio * circ;
+  const sportArcLength = Math.max(0.001, sportRatio * circ);
   const sportArcOffset = -(baseRatio * circ);
 
-  const diffWithSport = effectiveTarget - consumedKcal;
+  const diffWithSport = (baseTarget + burnedKcal) - consumedKcal;
   const diffWithoutSport = baseTarget - consumedKcal;
 
   return html`<div className="relative flex flex-col items-center justify-center">
@@ -478,31 +508,25 @@ const ProgressRing = React.memo(({
             cx=${radius}
             cy=${radius}
           />
-          ${burnedKcal > 0 && html`
+          ${animBurned > 0.5 && html`
             <circle
               stroke="#fbbf24"
               strokeWidth=${strokeW}
               strokeDasharray="${sportArcLength} ${circ}"
-              style=${{
-                strokeDashoffset: sportArcOffset,
-                transition: 'all 0.8s ease-out',
-                opacity: 0.95
-              }}
-              strokeLinecap="butt"
+              strokeDashoffset=${sportArcOffset}
+              strokeLinecap="round"
               fill="transparent"
               r=${normRadius}
               cx=${radius}
               cy=${radius}
+              style=${{ opacity: 0.95 }}
             />
           `}
           <circle
             stroke="#8b5cf6"
             strokeWidth=${strokeW}
             strokeDasharray=${circ}
-            style=${{
-              strokeDashoffset: mainOffset,
-              transition: 'stroke-dashoffset 0.8s ease-out'
-            }}
+            strokeDashoffset=${mainOffset}
             strokeLinecap="round"
             fill="transparent"
             r=${normRadius}
@@ -514,10 +538,7 @@ const ProgressRing = React.memo(({
               stroke="#ef4444"
               strokeWidth=${strokeW}
               strokeDasharray=${circ}
-              style=${{
-                strokeDashoffset: excessOffset,
-                transition: 'stroke-dashoffset 0.8s ease-out'
-              }}
+              strokeDashoffset=${excessOffset}
               strokeLinecap="round"
               fill="transparent"
               r=${normRadius}
@@ -528,11 +549,11 @@ const ProgressRing = React.memo(({
         </svg>
 
         <div className="absolute text-center flex flex-col items-center justify-center px-2">
-          <div className=${`text-3xl sm:text-4xl font-black tracking-tighter leading-none ${isExceededEffective ? 'text-rose-500' : 'text-white'}`}>
+          <div className=${`text-3xl sm:text-4xl font-black tracking-tighter leading-none ${consumedKcal > (baseTarget + burnedKcal) ? 'text-rose-500' : 'text-white'}`}>
             <${AnimatedNumber} value=${Math.round(consumedKcal)} />
           </div>
           <div className="text-[10px] font-bold text-slate-400 mt-1">
-            von ${Math.round(effectiveTarget)} kcal
+            von ${Math.round(baseTarget + burnedKcal)} kcal
           </div>
 
           <div className=${`text-[10px] font-black uppercase tracking-wider mt-1 ${
