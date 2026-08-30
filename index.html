@@ -521,38 +521,73 @@ const ProgressRing = React.memo(({
           `}
         </svg>
 
-        <div className="absolute text-center flex flex-col items-center justify-center px-4 max-w-[130px]">
-          <div className=${`text-3xl font-black tracking-tighter leading-none ${isExceededEffective ? 'text-rose-500' : 'text-white'}`}>
+        <div className="absolute text-center flex flex-col items-center justify-center px-2">
+          <div className=${`text-3xl sm:text-4xl font-black tracking-tighter leading-none ${isExceededEffective ? 'text-rose-500' : 'text-white'}`}>
             <${AnimatedNumber} value=${Math.round(consumedKcal)} />
           </div>
-          <div className="text-[8px] font-black uppercase text-slate-500 tracking-wider mt-0.5">kcal gegessen</div>
-
-          <div className=${`text-[9px] font-black uppercase tracking-wider mt-1 ${diffWithSport < 0 ? 'text-rose-500' : burnedKcal > 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
-            ${diffWithSport < 0 ? `${Math.abs(Math.round(diffWithSport))} kcal drüber` : `${Math.round(diffWithSport)} kcal übrig`}
+          <div className="text-[10px] font-bold text-slate-400 mt-1">
+            von <span className="text-white font-black">${Math.round(effectiveTarget)}</span> kcal
           </div>
 
-          ${burnedKcal > 0 && html`
-            <div className=${`text-[9px] font-bold tracking-tight mt-0.5 ${
-              isOverWithoutSport ? 'text-amber-400' : 'text-slate-500'
-            }`}>
-              Ohne Sport: ${diffWithoutSport < 0 ? `${Math.abs(Math.round(diffWithoutSport))} drüber` : `${Math.round(diffWithoutSport)} übrig`}
-            </div>
-          `}
+          <div className=${`text-[9px] font-black uppercase tracking-wider mt-1 px-2.5 py-0.5 rounded-full ${
+            diffWithSport < 0 
+              ? 'bg-rose-500/15 text-rose-400 border border-rose-500/20' 
+              : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20'
+          }`}>
+            ${diffWithSport < 0 ? `${Math.abs(Math.round(diffWithSport))} kcal drüber` : `${Math.round(diffWithSport)} kcal übrig`}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 mt-4 px-3.5 py-2 bg-slate-900/90 rounded-2xl border border-white/5 text-[10px] font-bold shadow-inner">
-        <span className="text-slate-300 flex items-center gap-1">🔥 ${Math.round(consumedKcal)} <span className="text-[9px] font-normal text-slate-500">gegessen</span></span>
-        ${burnedKcal > 0 ? html`
+      ${burnedKcal > 0 ? html`
+        <div className="mt-4 w-full space-y-2">
+          <!-- 4-Spalten Rechenleiste -->
+          <div className="grid grid-cols-4 items-center bg-slate-900/90 rounded-2xl p-3 border border-white/5 shadow-inner text-center">
+            <div className="space-y-0.5">
+              <div className="text-[8px] font-black uppercase text-slate-500 tracking-wider">Basis</div>
+              <div className="text-xs font-black text-white">${baseTarget}</div>
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-[8px] font-black uppercase text-amber-400 tracking-wider">+ Sport</div>
+              <div className="text-xs font-black text-amber-400">+${Math.round(burnedKcal)}</div>
+            </div>
+            <div className="space-y-0.5">
+              <div className="text-[8px] font-black uppercase text-brand-400 tracking-wider">- Essen</div>
+              <div className="text-xs font-black text-brand-300">-${Math.round(consumedKcal)}</div>
+            </div>
+            <div className="space-y-0.5 border-l border-white/10 pl-1">
+              <div className="text-[8px] font-black uppercase text-emerald-400 tracking-wider">= Übrig</div>
+              <div className=${`text-xs font-black ${diffWithSport < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
+                ${diffWithSport < 0 ? `-${Math.abs(Math.round(diffWithSport))}` : Math.round(diffWithSport)}
+              </div>
+            </div>
+          </div>
+
+          <!-- Klarer Vergleich: Ohne Sport -->
+          <div className="flex items-center justify-between px-3.5 py-2 bg-slate-900/50 rounded-xl border border-white/5 text-[10px]">
+            <div className="flex items-center gap-1.5 text-slate-400 font-semibold">
+              <span>📊</span>
+              <span>Ohne Sport:</span>
+            </div>
+            <div className=${`font-black text-[11px] ${diffWithoutSport < 0 ? 'text-rose-400' : 'text-slate-300'}`}>
+              ${diffWithoutSport < 0 
+                ? `${Math.abs(Math.round(diffWithoutSport))} kcal drüber` 
+                : `${Math.round(diffWithoutSport)} kcal übrig`}
+              <span className="text-[9px] font-normal text-slate-500 ml-1">(${baseTarget} - ${Math.round(consumedKcal)})</span>
+            </div>
+          </div>
+        </div>
+      ` : html`
+        <div className="flex items-center justify-center gap-3 mt-4 px-4 py-2 bg-slate-900/80 rounded-2xl border border-white/5 text-[11px] font-bold">
+          <span className="text-slate-400">🔥 ${Math.round(consumedKcal)} gegessen</span>
+          <span className="text-slate-600">/</span>
+          <span className="text-brand-300">🎯 ${baseTarget} Ziel</span>
           <span className="text-slate-600">|</span>
-          <span className="text-amber-400 flex items-center gap-1">⚡ +${Math.round(burnedKcal)} <span className="text-[9px] font-normal text-amber-400/80">Sport</span></span>
-          <span className="text-slate-600">|</span>
-          <span className="text-brand-300 flex items-center gap-1">🎯 ${Math.round(effectiveTarget)} <span className="text-[9px] font-normal text-brand-300/80">Ziel</span> <span className="text-[8px] text-slate-500 font-normal">(${baseTarget} Basis)</span></span>
-        ` : html`
-          <span className="text-slate-600">|</span>
-          <span className="text-brand-300 flex items-center gap-1">🎯 ${baseTarget} <span className="text-[9px] font-normal text-brand-300/80">Ziel</span></span>
-        `}
-      </div>
+          <span className=${diffWithoutSport < 0 ? 'text-rose-400 font-black' : 'text-emerald-400 font-black'}>
+            ${diffWithoutSport < 0 ? `${Math.abs(Math.round(diffWithoutSport))} kcal drüber` : `${Math.round(diffWithoutSport)} kcal übrig`}
+          </span>
+        </div>
+      `}
     </div>`;
 });
 const MacroBar = ({
