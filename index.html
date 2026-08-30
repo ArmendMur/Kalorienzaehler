@@ -240,7 +240,18 @@ const GoalInput = ({
 // --- MAIN APP ---
 function App() {
   const [activeTab, setActiveTab] = useState('frequent');
-  const [aiGoalForm, setAiGoalForm] = useState({ age: 30, gender: 'männlich', height: 183, weight: 80, activity: 'IT-Job (sitze viel vorm PC), aber mache 2x die Woche Sport/Schwimmen', goal: 'abnehmen', months: 6 });
+  const [aiGoalForm, setAiGoalForm] = useState(() => {
+    const saved = localStorage.getItem('kTrackAiGoalForm');
+    return saved && saved !== "null" ? JSON.parse(saved) : {
+      age: 30,
+      gender: 'männlich',
+      height: 183,
+      weight: 80,
+      activity: 'IT-Job (sitze viel vorm PC), aber mache 2x die Woche Sport/Schwimmen',
+      goal: 'abnehmen',
+      months: 6
+    };
+  });
   const [isAiGoalLoading, setIsAiGoalLoading] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth());
@@ -295,6 +306,9 @@ function App() {
   useEffect(() => {
     localStorage.setItem('kTrackUser', JSON.stringify(user));
   }, [user]);
+  useEffect(() => {
+    localStorage.setItem('kTrackAiGoalForm', JSON.stringify(aiGoalForm));
+  }, [aiGoalForm]);
   useEffect(() => {
     const cleanLogs = {};
     for (const key in allLogs) {
@@ -1208,6 +1222,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
     <button onClick=${() => {
       const data = {
         user: JSON.parse(localStorage.getItem('kTrackUser') || '{}'),
+        aiGoalForm: JSON.parse(localStorage.getItem('kTrackAiGoalForm') || '{}'),
         history: JSON.parse(localStorage.getItem('kTrackHistory') || '[]'),
         logs: JSON.parse(localStorage.getItem('kTrackAllLogs') || '{}'),
       };
@@ -1233,6 +1248,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
         try {
           const data = JSON.parse(ev.target.result);
           if (data.user) localStorage.setItem('kTrackUser', JSON.stringify(data.user));
+          if (data.aiGoalForm) localStorage.setItem('kTrackAiGoalForm', JSON.stringify(data.aiGoalForm));
           if (data.history) localStorage.setItem('kTrackHistory', JSON.stringify(data.history));
           if (data.logs) localStorage.setItem('kTrackAllLogs', JSON.stringify(data.logs));
           alert("Erfolgreich importiert!");
