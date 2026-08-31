@@ -480,9 +480,6 @@ const ProgressRing = React.memo(({
   const normRadius = radius - strokeW;
   const circ = normRadius * 2 * Math.PI;
 
-  const baseRatio = effectiveTarget > 0 ? (baseTarget / effectiveTarget) : 1;
-  const sportRatio = effectiveTarget > 0 ? (animBurned / effectiveTarget) : 0;
-
   const rawConsumedPercent = effectiveTarget > 0 ? (animConsumed / effectiveTarget) * 100 : 0;
   const mainPercent = Math.min(rawConsumedPercent, 100);
   const mainOffset = circ - (mainPercent / 100) * circ;
@@ -491,11 +488,7 @@ const ProgressRing = React.memo(({
   const excessEffectivePercent = isExceededEffective ? Math.min(((animConsumed - effectiveTarget) / effectiveTarget) * 100, 100) : 0;
   const excessOffset = circ - (excessEffectivePercent / 100) * circ;
 
-  const sportArcLength = Math.max(0.001, sportRatio * circ);
-  const sportArcOffset = -(baseRatio * circ);
-
   const diffWithSport = (baseTarget + burnedKcal) - consumedKcal;
-  const diffWithoutSport = baseTarget - consumedKcal;
 
   return html`<div className="relative flex flex-col items-center justify-center">
       <div className="relative flex items-center justify-center">
@@ -508,20 +501,6 @@ const ProgressRing = React.memo(({
             cx=${radius}
             cy=${radius}
           />
-          ${animBurned > 0.5 && html`
-            <circle
-              stroke="#fbbf24"
-              strokeWidth=${strokeW}
-              strokeDasharray="${sportArcLength} ${circ}"
-              strokeDashoffset=${sportArcOffset}
-              strokeLinecap="round"
-              fill="transparent"
-              r=${normRadius}
-              cx=${radius}
-              cy=${radius}
-              style=${{ opacity: 0.95 }}
-            />
-          `}
           <circle
             stroke="#8b5cf6"
             strokeWidth=${strokeW}
@@ -552,8 +531,9 @@ const ProgressRing = React.memo(({
           <div className=${`text-3xl sm:text-4xl font-black tracking-tighter leading-none ${consumedKcal > (baseTarget + burnedKcal) ? 'text-rose-500' : 'text-white'}`}>
             <${AnimatedNumber} value=${Math.round(consumedKcal)} />
           </div>
-          <div className="text-[10px] font-bold text-slate-400 mt-1">
-            von ${Math.round(baseTarget + burnedKcal)} kcal
+          <div className="text-[10px] font-bold text-slate-400 mt-1 flex items-center justify-center gap-1">
+            <span>von ${Math.round(baseTarget + burnedKcal)} kcal</span>
+            ${burnedKcal > 0 && html`<span className="text-amber-400 font-extrabold">(+${Math.round(burnedKcal)} ⚡)</span>`}
           </div>
 
           <div className=${`text-[10px] font-black uppercase tracking-wider mt-1 ${
@@ -577,11 +557,11 @@ const ProgressRing = React.memo(({
               <div className="text-xs font-black text-amber-400">+${Math.round(burnedKcal)}</div>
             </div>
             <div className="space-y-0.5">
-              <div className="text-[8px] font-black uppercase text-brand-400 tracking-wider">- Essen</div>
+              <div className="text-[8px] font-black uppercase text-brand-400 tracking-wider">- Gegessen</div>
               <div className="text-xs font-black text-brand-300">-${Math.round(consumedKcal)}</div>
             </div>
             <div className="space-y-0.5 border-l border-white/10 pl-1">
-              <div className="text-[8px] font-black uppercase text-emerald-400 tracking-wider">= Übrig</div>
+              <div className="text-[8px] font-black uppercase text-emerald-400 tracking-wider">= Noch übrig</div>
               <div className=${`text-xs font-black ${diffWithSport < 0 ? 'text-rose-500' : 'text-emerald-400'}`}>
                 ${diffWithSport < 0 ? `-${Math.abs(Math.round(diffWithSport))}` : Math.round(diffWithSport)}
               </div>
@@ -1089,8 +1069,7 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
   "emoji": "Passendes einzelnes Emoji (z.B. 🏋️‍♂️, 🏃, 🚴, 🏊, ⚽, 🧘, 🚶)",
   "durationMinutes": 45,
   "burnedCalories": 280,
-  "intensity": "leicht" | "moderat" | "intensiv",
-  "explanation": "Kurze 1-Satz Erklärung (z.B. Bei 80kg und moderater Intensität werden ca. 6-7 kcal/Min verbrannt.)"
+  "intensity": "leicht" | "moderat" | "intensiv"
 }`;
 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
@@ -1114,8 +1093,7 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
         emoji: parsed.emoji || '⚡',
         durationMinutes: Number(parsed.durationMinutes) || 30,
         burnedCalories: Number(parsed.burnedCalories) || 200,
-        intensity: parsed.intensity || 'moderat',
-        explanation: parsed.explanation || ''
+        intensity: parsed.intensity || 'moderat'
       });
       setActivityStep('preview');
       triggerHaptic('success');
@@ -1889,8 +1867,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       name: act.name,
       emoji: act.emoji || '⚡',
       durationMinutes: act.durationMinutes || 30,
-      burnedCalories: act.burnedCalories || act.calories || 200,
-      explanation: act.explanation || ''
+      burnedCalories: act.burnedCalories || act.calories || 200
     });
     setEditingInstanceId(act.instanceId);
     setActivityStep('preview');
@@ -2275,8 +2252,7 @@ ${showActivityModal && html`
                     name: act.name,
                     emoji: act.emoji || '⚡',
                     durationMinutes: Number(act.durationMinutes) || 30,
-                    burnedCalories: Number(act.burnedCalories) || 200,
-                    explanation: 'Aus deinem Verlauf übernommen'
+                    burnedCalories: Number(act.burnedCalories) || 200
                   });
                   setActivityStep('preview');
                 }}
@@ -2381,12 +2357,6 @@ ${showActivityModal && html`
               </div>
             </div>
           </div>
-
-          ${activityDraft?.explanation && html`
-            <div className="p-3 bg-slate-950/50 rounded-xl border border-white/5 text-xs text-slate-400 italic">
-              💡 ${activityDraft.explanation}
-            </div>
-          `}
         </div>
 
         <div className="flex flex-col gap-2.5">
