@@ -480,19 +480,32 @@ const ProgressRing = React.memo(({
   const normRadius = radius - strokeW;
   const circ = normRadius * 2 * Math.PI;
 
-  const rawConsumedPercent = effectiveTarget > 0 ? (animConsumed / effectiveTarget) * 100 : 0;
-  const mainPercent = Math.min(rawConsumedPercent, 100);
-  const mainOffset = circ - (mainPercent / 100) * circ;
+  const baseRatio = effectiveTarget > 0 ? (baseTarget / effectiveTarget) : 1;
+  const sportRatio = effectiveTarget > 0 ? (animBurned / effectiveTarget) : 0;
 
+  // 1. Sport-Puffer (Dunkelgelber Hintergrund-Balken für freigeschaltetes Extra-Budget)
+  const sportArcLength = Math.max(0.001, sportRatio * circ);
+  const sportArcOffset = -(baseRatio * circ);
+
+  // 2. Gegessene Kalorien im Basis-Bereich (Lila)
+  const consumedInBase = Math.min(animConsumed, baseTarget);
+  const purpleArcLength = effectiveTarget > 0 ? (consumedInBase / effectiveTarget) * circ : 0;
+
+  // 3. Gegessene Kalorien im Sport-Bonus-Bereich (Leuchtendes Gelb)
+  const consumedInSport = Math.max(0, Math.min(animConsumed - baseTarget, animBurned));
+  const sportConsumedLength = effectiveTarget > 0 ? (consumedInSport / effectiveTarget) * circ : 0;
+
+  // 4. Überschuss (Rot)
   const isExceededEffective = animConsumed > effectiveTarget;
-  const excessEffectivePercent = isExceededEffective ? Math.min(((animConsumed - effectiveTarget) / effectiveTarget) * 100, 100) : 0;
-  const excessOffset = circ - (excessEffectivePercent / 100) * circ;
+  const excessKcal = isExceededEffective ? animConsumed - effectiveTarget : 0;
+  const excessArcLength = effectiveTarget > 0 ? Math.min((excessKcal / effectiveTarget) * circ, circ) : 0;
 
   const diffWithSport = (baseTarget + burnedKcal) - consumedKcal;
 
   return html`<div className="relative flex flex-col items-center justify-center">
       <div className="relative flex items-center justify-center">
         <svg className="relative z-10 transform -rotate-90" height=${radius * 2} width=${radius * 2}>
+          <!-- Basis-Hintergrundkreis -->
           <circle
             stroke="#1e293b"
             strokeWidth=${strokeW}
@@ -501,23 +514,60 @@ const ProgressRing = React.memo(({
             cx=${radius}
             cy=${radius}
           />
-          <circle
-            stroke="#8b5cf6"
-            strokeWidth=${strokeW}
-            strokeDasharray=${circ}
-            strokeDashoffset=${mainOffset}
-            strokeLinecap="round"
-            fill="transparent"
-            r=${normRadius}
-            cx=${radius}
-            cy=${radius}
-          />
-          ${isExceededEffective && html`
+          
+          <!-- Dunklerer gelber Sport-Puffer (Zeigt den durch Sport gewonnenen Freiraum) -->
+          ${animBurned > 0.5 && html`
+            <circle
+              stroke="#b45309"
+              strokeOpacity="0.4"
+              strokeWidth=${strokeW}
+              strokeDasharray="${sportArcLength} ${circ}"
+              strokeDashoffset=${sportArcOffset}
+              strokeLinecap="round"
+              fill="transparent"
+              r=${normRadius}
+              cx=${radius}
+              cy=${radius}
+            />
+          `}
+
+          <!-- Gegessene Kalorien (Lila Bogen) -->
+          ${purpleArcLength > 0.5 && html`
+            <circle
+              stroke="#8b5cf6"
+              strokeWidth=${strokeW}
+              strokeDasharray="${purpleArcLength} ${circ}"
+              strokeDashoffset="0"
+              strokeLinecap="round"
+              fill="transparent"
+              r=${normRadius}
+              cx=${radius}
+              cy=${radius}
+            />
+          `}
+
+          <!-- Aktiv genutzter Sport-Bonus (Leuchtend Gelb, wenn man ins Sport-Budget isst) -->
+          ${sportConsumedLength > 0.5 && html`
+            <circle
+              stroke="#fbbf24"
+              strokeWidth=${strokeW}
+              strokeDasharray="${sportConsumedLength} ${circ}"
+              strokeDashoffset=${sportArcOffset}
+              strokeLinecap="round"
+              fill="transparent"
+              r=${normRadius}
+              cx=${radius}
+              cy=${radius}
+            />
+          `}
+
+          <!-- Überschreitung über Basis+Sport (Roter Bogen) -->
+          ${isExceededEffective && excessArcLength > 0.5 && html`
             <circle
               stroke="#ef4444"
               strokeWidth=${strokeW}
-              strokeDasharray=${circ}
-              strokeDashoffset=${excessOffset}
+              strokeDasharray="${excessArcLength} ${circ}"
+              strokeDashoffset="0"
               strokeLinecap="round"
               fill="transparent"
               r=${normRadius}
@@ -533,8 +583,13 @@ const ProgressRing = React.memo(({
           </div>
           <div className="text-[10px] font-bold text-slate-400 mt-1 flex items-center justify-center gap-1">
             <span>von ${Math.round(baseTarget + burnedKcal)} kcal</span>
-            ${burnedKcal > 0 && html`<span className="text-amber-400 font-extrabold">(+${Math.round(burnedKcal)} ⚡)</span>`}
           </div>
+
+          ${burnedKcal > 0 && html`
+            <div className="text-[9px] font-extrabold text-amber-400 mt-0.5 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+              ⚡ +${Math.round(burnedKcal)} kcal Sport-Bonus
+            </div>
+          `}
 
           <div className=${`text-[10px] font-black uppercase tracking-wider mt-1 ${
             diffWithSport < 0 ? 'text-rose-500' : 'text-emerald-400'
