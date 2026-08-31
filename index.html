@@ -474,105 +474,106 @@ const ProgressRing = React.memo(({
     window.requestAnimationFrame(step);
   }, [consumedKcal, burnedKcal]);
 
-  const effectiveTarget = baseTarget + animBurned;
-  const radius = 88;
-  const strokeW = 12;
-  const normRadius = radius - strokeW;
-  const circ = normRadius * 2 * Math.PI;
+  // Dimensionen:
+  // Haupt-Ring (Basis-Ernährung):
+  const rInner = 74;
+  const strokeWInner = 11;
+  const normRadiusInner = rInner - strokeWInner / 2;
+  const circInner = normRadiusInner * 2 * Math.PI;
 
-  const baseRatio = effectiveTarget > 0 ? (baseTarget / effectiveTarget) : 1;
-  const sportRatio = effectiveTarget > 0 ? (animBurned / effectiveTarget) : 0;
+  // Äußerer Ring On-Top (Sport-Balken):
+  const rOuter = 88;
+  const strokeWOuter = 6;
+  const normRadiusOuter = rOuter - strokeWOuter / 2;
+  const circOuter = normRadiusOuter * 2 * Math.PI;
 
-  // 1. Sport-Puffer (Dunkelgelber Hintergrund-Balken für freigeschaltetes Extra-Budget)
-  const sportArcLength = Math.max(0.001, sportRatio * circ);
-  const sportArcOffset = -(baseRatio * circ);
+  // 1. Basis-Ring (Gegessene Kalorien vs. Basis-Ziel z.B. 2000 kcal)
+  const consumedPercentBase = baseTarget > 0 ? Math.min((animConsumed / baseTarget) * 100, 100) : 0;
+  const innerOffset = circInner - (consumedPercentBase / 100) * circInner;
 
-  // 2. Gegessene Kalorien im Basis-Bereich (Lila)
-  const consumedInBase = Math.min(animConsumed, baseTarget);
-  const purpleArcLength = effectiveTarget > 0 ? (consumedInBase / effectiveTarget) * circ : 0;
+  // 2. Äußerer Sport-Balken "On-Top" (Visualisiert die durch Sport zusätzlich freigeschalteten Kalorien)
+  const sportArcRatio = baseTarget > 0 ? Math.min(animBurned / baseTarget, 1) : 0;
+  const sportArcLength = Math.max(0.001, sportArcRatio * circOuter);
 
-  // 3. Gegessene Kalorien im Sport-Bonus-Bereich (Leuchtendes Gelb)
-  const consumedInSport = Math.max(0, Math.min(animConsumed - baseTarget, animBurned));
-  const sportConsumedLength = effectiveTarget > 0 ? (consumedInSport / effectiveTarget) * circ : 0;
-
-  // 4. Überschuss (Rot)
-  const isExceededEffective = animConsumed > effectiveTarget;
-  const excessKcal = isExceededEffective ? animConsumed - effectiveTarget : 0;
-  const excessArcLength = effectiveTarget > 0 ? Math.min((excessKcal / effectiveTarget) * circ, circ) : 0;
+  // Überschreitung (wenn man mehr als Basis + Sport gegessen hat)
+  const effectiveTotal = baseTarget + animBurned;
+  const isExceededEffective = animConsumed > effectiveTotal;
+  const excessKcal = isExceededEffective ? animConsumed - effectiveTotal : 0;
+  const excessPercent = effectiveTotal > 0 ? Math.min((excessKcal / effectiveTotal) * 100, 100) : 0;
+  const excessInnerOffset = circInner - (excessPercent / 100) * circInner;
 
   const diffWithSport = (baseTarget + burnedKcal) - consumedKcal;
 
   return html`<div className="relative flex flex-col items-center justify-center">
       <div className="relative flex items-center justify-center">
-        <svg className="relative z-10 transform -rotate-90" height=${radius * 2} width=${radius * 2}>
-          <!-- Basis-Hintergrundkreis -->
+        <svg className="relative z-10 transform -rotate-90" height="196" width="196" viewBox="0 0 196 196">
+          <!-- 1. ÄUSSERER SPORT-BALKEN (ON-TOP) - VÖLLIG GETRENNT VOM BASIS-KREIS -->
+          ${animBurned > 0.5 && html`
+            <g className="transition-opacity duration-500">
+              <!-- Dunklerer Hintergrund-Slot für Sport -->
+              <circle
+                stroke="#b45309"
+                strokeOpacity="0.25"
+                strokeWidth=${strokeWOuter}
+                strokeDasharray="${sportArcLength} ${circOuter}"
+                strokeDashoffset="0"
+                strokeLinecap="round"
+                fill="transparent"
+                r=${normRadiusOuter}
+                cx="98"
+                cy="98"
+              />
+              <!-- Leuchtender aktiver Sport-Balken On-Top -->
+              <circle
+                stroke="#fbbf24"
+                strokeWidth=${strokeWOuter}
+                strokeDasharray="${sportArcLength} ${circOuter}"
+                strokeDashoffset="0"
+                strokeLinecap="round"
+                fill="transparent"
+                r=${normRadiusOuter}
+                cx="98"
+                cy="98"
+                style=${{ filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.5))' }}
+              />
+            </g>
+          `}
+
+          <!-- 2. HAUPTKREIS BASIS-KALORIEN (Dunkler leerer Track für freie Kalorien) -->
           <circle
             stroke="#1e293b"
-            strokeWidth=${strokeW}
+            strokeWidth=${strokeWInner}
             fill="transparent"
-            r=${normRadius}
-            cx=${radius}
-            cy=${radius}
+            r=${normRadiusInner}
+            cx="98"
+            cy="98"
           />
-          
-          <!-- Dunklerer gelber Sport-Puffer (Zeigt den durch Sport gewonnenen Freiraum) -->
-          ${animBurned > 0.5 && html`
-            <circle
-              stroke="#b45309"
-              strokeOpacity="0.4"
-              strokeWidth=${strokeW}
-              strokeDasharray="${sportArcLength} ${circ}"
-              strokeDashoffset=${sportArcOffset}
-              strokeLinecap="round"
-              fill="transparent"
-              r=${normRadius}
-              cx=${radius}
-              cy=${radius}
-            />
-          `}
 
-          <!-- Gegessene Kalorien (Lila Bogen) -->
-          ${purpleArcLength > 0.5 && html`
-            <circle
-              stroke="#8b5cf6"
-              strokeWidth=${strokeW}
-              strokeDasharray="${purpleArcLength} ${circ}"
-              strokeDashoffset="0"
-              strokeLinecap="round"
-              fill="transparent"
-              r=${normRadius}
-              cx=${radius}
-              cy=${radius}
-            />
-          `}
+          <!-- Gegessene Basis-Kalorien (Lila Füllung) -->
+          <circle
+            stroke="#8b5cf6"
+            strokeWidth=${strokeWInner}
+            strokeDasharray=${circInner}
+            strokeDashoffset=${innerOffset}
+            strokeLinecap="round"
+            fill="transparent"
+            r=${normRadiusInner}
+            cx="98"
+            cy="98"
+          />
 
-          <!-- Aktiv genutzter Sport-Bonus (Leuchtend Gelb, wenn man ins Sport-Budget isst) -->
-          ${sportConsumedLength > 0.5 && html`
-            <circle
-              stroke="#fbbf24"
-              strokeWidth=${strokeW}
-              strokeDasharray="${sportConsumedLength} ${circ}"
-              strokeDashoffset=${sportArcOffset}
-              strokeLinecap="round"
-              fill="transparent"
-              r=${normRadius}
-              cx=${radius}
-              cy=${radius}
-            />
-          `}
-
-          <!-- Überschreitung über Basis+Sport (Roter Bogen) -->
-          ${isExceededEffective && excessArcLength > 0.5 && html`
+          <!-- Roter Überschuss-Bogen, falls Gesamtziel überschritten -->
+          ${isExceededEffective && excessPercent > 0 && html`
             <circle
               stroke="#ef4444"
-              strokeWidth=${strokeW}
-              strokeDasharray="${excessArcLength} ${circ}"
-              strokeDashoffset="0"
+              strokeWidth=${strokeWInner}
+              strokeDasharray=${circInner}
+              strokeDashoffset=${excessInnerOffset}
               strokeLinecap="round"
               fill="transparent"
-              r=${normRadius}
-              cx=${radius}
-              cy=${radius}
+              r=${normRadiusInner}
+              cx="98"
+              cy="98"
             />
           `}
         </svg>
@@ -585,13 +586,7 @@ const ProgressRing = React.memo(({
             <span>von ${Math.round(baseTarget + burnedKcal)} kcal</span>
           </div>
 
-          ${burnedKcal > 0 && html`
-            <div className="text-[9px] font-extrabold text-amber-400 mt-0.5 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-              ⚡ +${Math.round(burnedKcal)} kcal Sport-Bonus
-            </div>
-          `}
-
-          <div className=${`text-[10px] font-black uppercase tracking-wider mt-1 ${
+          <div className=${`text-[10px] font-black uppercase tracking-wider mt-1.5 ${
             diffWithSport < 0 ? 'text-rose-500' : 'text-emerald-400'
           }`}>
             ${diffWithSport < 0 ? `${Math.abs(Math.round(diffWithSport))} kcal drüber` : `${Math.round(diffWithSport)} kcal übrig`}
