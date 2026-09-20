@@ -882,6 +882,7 @@ function App() {
     // Suche reagiert jetzt sofort reaktiv und ohne Verzögerung
   }, []);
   const handleAiTextClick = () => {
+    triggerHaptic('light');
     if (searchQuery.length < 2) {
       if (searchInputRef.current) searchInputRef.current.focus();
     } else {
@@ -911,6 +912,7 @@ function App() {
   };
 
   const openNewRecipeModal = () => {
+    triggerHaptic('light');
     setRecipeDraft({
       id: generateId(),
       name: '',
@@ -926,6 +928,7 @@ function App() {
 
   const openEditRecipe = (recipe) => {
     if (!recipe) return;
+    triggerHaptic('light');
     setRecipeDraft({
       id: recipe.id || generateId(),
       name: recipe.name || '',
@@ -1059,6 +1062,7 @@ function App() {
     };
   }, [isScanning]);
   const handleSafeAction = fn => e => {
+    triggerHaptic('light');
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -1393,6 +1397,7 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
   };
 
   const calculateGoalsViaAi = async () => {
+    triggerHaptic('light');
     if (!user.geminiApiKey) return alert("Bitte hinterlege deinen API Key unten im Profil!");
     setIsAiGoalLoading(true);
     try {
@@ -1424,6 +1429,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           targetC: Number(goals.targetC),
           targetF: Number(goals.targetF)
         }));
+        triggerHaptic('success');
         alert("Ziele erfolgreich berechnet und übernommen!");
       } else {
         throw new Error("Fehlende Werte im JSON der KI.");
@@ -1436,6 +1442,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
   };
 
   const runAiCoach = async () => {
+    triggerHaptic('light');
     if (!user.geminiApiKey) return alert("Bitte hinterlege deinen API Key im Profil!");
     setIsAiCoachLoading(true);
     setAiCoachResult(null);
@@ -1475,6 +1482,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       const jsonMatch = textContent.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error("Die KI hat kein erkennbares Format geliefert.");
       setAiCoachResult(JSON.parse(jsonMatch[0]));
+      triggerHaptic('success');
     } catch(e) {
       alert("Fehler bei der Analyse: " + e.message);
     } finally {
@@ -1482,6 +1490,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     }
   };
   const startBarcodeScan = () => {
+    triggerHaptic('light');
     setIsScanning(true);
     setTimeout(() => {
       const config = {
@@ -1542,6 +1551,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     }, 300);
   };
   const stopBarcodeScan = () => {
+    triggerHaptic('light');
     if (qrInstance.current) {
       qrInstance.current.stop().then(() => {
         qrInstance.current.clear();
@@ -1713,6 +1723,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     }
   };
   const selectFood = food => {
+    triggerHaptic('light');
     const rawF = Number(food.baseFat ?? food.fat ?? 0);
     const rawSF = Number(food.baseSaturatedFat ?? food.saturatedFat ?? 0);
     const rawUF = food.baseUnsaturatedFat !== undefined ? Number(food.baseUnsaturatedFat) : (food.unsaturatedFat !== undefined ? Number(food.unsaturatedFat) : Math.max(0, rawF - rawSF));
@@ -1735,6 +1746,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setAmount(food.lastAmount || 100);
   };
   const openEdit = item => {
+    triggerHaptic('light');
     const rawF = Number(item.baseFat ?? 0);
     const rawSF = Number(item.baseSaturatedFat ?? 0);
     const rawUF = item.baseUnsaturatedFat !== undefined ? Number(item.baseUnsaturatedFat) : Math.max(0, rawF - rawSF);
@@ -1856,7 +1868,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           <div className="flex items-center gap-3.5 mb-6">
             <div className="text-3xl shrink-0">${showDetails?.emoji || "🍽️"}</div>
             <h3 className="flex-1 min-w-0 text-xl sm:text-2xl font-black text-white leading-tight break-words">${showDetails?.name || "Unbenannt"}</h3>
-            <button onClick=${() => setShowDetails(null)} className="shrink-0 p-2 bg-slate-800 rounded-full"><${XIcon} size=${20}/></button>
+            <button onClick=${() => { triggerHaptic('light'); setShowDetails(null); }} className="shrink-0 p-2 bg-slate-800 rounded-full"><${XIcon} size=${20}/></button>
           </div>
         </div>
         <div className="w-full max-w-[310px] mx-auto bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
@@ -1927,7 +1939,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 </div>
         </div>
         <div className="flex gap-3">
-          <button onClick=${() => setShowDetails(null)} className="flex-1 py-4 bg-slate-800 rounded-2xl font-bold">Schließen</button>
+          <button onClick=${() => { triggerHaptic('light'); setShowDetails(null); }} className="flex-1 py-4 bg-slate-800 rounded-2xl font-bold">Schließen</button>
           <button onClick=${() => openEdit(showDetails)} className="flex-[2] py-4 bg-brand-600 rounded-2xl font-black shadow-lg active:opacity-80">Bearbeiten</button>
         </div>
       </div>
@@ -1941,12 +1953,14 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       const stepWeight = unitInfo ? unitInfo.pieceWeight : 50;
 
       return html`<div className="fixed inset-0 bg-slate-950/90 z-[450] backdrop-blur-sm animate-in fade-in duration-300" onClick=${() => {
+        triggerHaptic('light');
         setSelectedFood(null);
         setEditingInstanceId(null);
       }}/>
       <div className="fixed bottom-2.5 left-2.5 right-2.5 z-[460] glass-card rounded-[2.5rem] p-4 sm:p-5 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3 mb-3">
           <button onClick=${() => {
+            triggerHaptic('light');
             const input = prompt("Wähle ein Emoji:", selectedFood?.emoji || "🍽️");
             if (input) {
               const newEmoji = [...input.trim()][0];
@@ -1955,6 +1969,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           }} className="w-11 h-11 shrink-0 bg-slate-800/80 rounded-[1.1rem] flex items-center justify-center text-2xl border border-white/10 shadow-inner hover:bg-slate-700 transition-colors">${selectedFood?.emoji || "🍽️"}</button>
           <input type="text" value=${selectedFood?.name || ""} placeholder="Name des Essens" onChange=${e => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent flex-1 min-w-0 text-xl sm:text-2xl font-black text-white outline-none border-b border-white/10 focus:border-brand-500"/>
           <button type="button" onClick=${() => {
+            triggerHaptic('light');
             setSelectedFood(null);
             setEditingInstanceId(null);
           }} className="shrink-0 p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
@@ -2193,7 +2208,8 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       <${ZapIcon} size=${11} className="text-amber-400"/> + Aktivität
     </button>
   </div>
-  <div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => setShowDetails(selected)} onSelectActivity=${(act) => {
+  <div className="space-y-3">${!dailyLog.items || dailyLog.items.length === 0 ? html`<div className="py-16 text-center opacity-30 italic text-sm">Keine Einträge an diesem Tag</div>` : [...dailyLog.items].reverse().map(item => html`<${SwipeableLogItem} key=${item.instanceId} item=${item} onSelect=${(selected) => { triggerHaptic('light'); setShowDetails(selected); }} onSelectActivity=${(act) => {
+    triggerHaptic('light');
     setActivityDraft({
       name: act.name,
       emoji: act.emoji || '⚡',
@@ -2205,10 +2221,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setShowActivityModal(true);
   }} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div>
 </div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-5 mt-2"><button onClick=${() => {
+    triggerHaptic('light');
     setView('dashboard');
     setSearchQuery('');
     setApiResults([]);
-  }} className="p-3.5 glass-card rounded-2xl active:scale-90 transition-all"><${ArrowLeftIcon} size=${22}/></button><h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-3 mb-3.5 sm:mb-4"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-4 pr-12 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner text-sm sm:text-base"/>${searchQuery ? html`<button onClick=${() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-white active:scale-90 transition-all"><${XIcon} size=${18}/></button>` : html`<div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"><${SearchIcon} size=${18}/></div>`}</div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="grid grid-cols-4 gap-2"><button onClick=${handleAiTextClick} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white">${isThinking ? html`<${LoaderIcon} size=${15}/>` : html`<${SparklesIcon} size=${15} className="text-brand-400"/>`} AI Text</button><button onClick=${() => aiFileRef.current.click()} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${CameraIcon} size=${15} className="text-brand-400"/> AI Foto</button><button onClick=${() => { triggerHaptic('light'); setShowActivityModal(true); setActivityStep('input'); }} disabled=${isThinking} className="bg-amber-500/10 border border-amber-500/30 py-3 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-amber-500/20 transition-all text-amber-400"><${ZapIcon} size=${15} className="text-amber-400"/> Aktivität</button><button onClick=${() => {
+  }} className="p-3.5 glass-card rounded-2xl active:scale-90 transition-all"><${ArrowLeftIcon} size=${22}/></button><h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Tracken</h2></div><div className="space-y-3 mb-3.5 sm:mb-4"><div className="flex gap-2 relative"><div className="flex-1 relative"><input type="text" placeholder="Essen suchen..." ref=${searchInputRef} value=${searchQuery} onChange=${e => setSearchQuery(e.target.value)} onKeyDown=${e => e.key === 'Enter' && triggerSearch()} className="w-full p-4 pr-12 bg-slate-900 border border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-brand-500 text-white font-bold shadow-inner text-sm sm:text-base"/>${searchQuery ? html`<button onClick=${() => { triggerHaptic('light'); setSearchQuery(''); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-400 hover:text-white active:scale-90 transition-all"><${XIcon} size=${18}/></button>` : html`<div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"><${SearchIcon} size=${18}/></div>`}</div><button onClick=${startBarcodeScan} className="w-20 bg-brand-600 rounded-2xl flex flex-col items-center justify-center gap-1 shadow-lg active:scale-95 transition-all text-slate-950"><${BarcodeIcon} size=${20}/><span className="text-[8px] font-black uppercase">Barcode</span></button></div><div className="grid grid-cols-4 gap-2"><button onClick=${handleAiTextClick} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white">${isThinking ? html`<${LoaderIcon} size=${15}/>` : html`<${SparklesIcon} size=${15} className="text-brand-400"/>`} AI Text</button><button onClick=${() => { triggerHaptic('light'); aiFileRef.current.click(); }} disabled=${isThinking} className="bg-slate-900 border border-white/10 py-3 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-slate-800 transition-colors text-white"><${CameraIcon} size=${15} className="text-brand-400"/> AI Foto</button><button onClick=${() => { triggerHaptic('light'); setShowActivityModal(true); setActivityStep('input'); }} disabled=${isThinking} className="bg-amber-500/10 border border-amber-500/30 py-3 px-1 rounded-2xl font-black text-[9px] uppercase flex flex-col items-center justify-center gap-1 active:bg-amber-500/20 transition-all text-amber-400"><${ZapIcon} size=${15} className="text-amber-400"/> Aktivität</button><button onClick=${() => {
+    triggerHaptic('light');
     setSelectedFood({
       name: searchQuery || '',
       calories: 0,
@@ -2363,6 +2381,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             <${SparklesIcon} size=${14}/> Mit KI analysieren
           </button>
           <button onClick=${() => {
+            triggerHaptic('light');
             setSelectedFood({
               name: searchQuery,
               calories: 0,
@@ -2396,15 +2415,16 @@ ${showRecipeModal && (() => {
     : [];
 
   return html`
-    <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => setShowRecipeModal(false)}/>
+    <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => { triggerHaptic('light'); setShowRecipeModal(false); }}/>
     <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-black flex items-center gap-3 text-white">🥗 ${recipeDraft.id && recipes.some(r => r.id === recipeDraft.id) ? 'Rezept bearbeiten' : 'Rezept erstellen'}</h3>
-        <button onClick=${() => setShowRecipeModal(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white"><${XIcon} size=${20}/></button>
+        <button onClick=${() => { triggerHaptic('light'); setShowRecipeModal(false); }} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white"><${XIcon} size=${20}/></button>
       </div>
 
       <div className="flex items-center gap-3">
         <button onClick=${() => {
+          triggerHaptic('light');
           const input = prompt("Wähle ein Emoji (oder leer lassen für KI):", recipeDraft.emoji || "🥗");
           if (input) {
             const newEmoji = [...input.trim()][0];
@@ -2433,9 +2453,9 @@ ${showRecipeModal && (() => {
       <div className="flex items-center justify-between p-3 bg-slate-900/60 rounded-2xl border border-white/5">
         <span className="text-xs font-bold text-slate-400">Portionen</span>
         <div className="flex items-center gap-3">
-          <button type="button" onClick=${() => setRecipeDraft(p => ({ ...p, servings: Math.max(1, (p.servings || 1) - 1) }))} className="p-2 bg-slate-800 rounded-xl active:scale-90 text-white"><${MinusIcon} size=${14}/></button>
+          <button type="button" onClick=${() => { triggerHaptic('light'); setRecipeDraft(p => ({ ...p, servings: Math.max(1, (p.servings || 1) - 1) })); }} className="p-2 bg-slate-800 rounded-xl active:scale-90 text-white"><${MinusIcon} size=${14}/></button>
           <span className="font-black text-white text-base">${recipeDraft.servings || 1}</span>
-          <button type="button" onClick=${() => setRecipeDraft(p => ({ ...p, servings: (p.servings || 1) + 1 }))} className="p-2 bg-brand-500 text-slate-950 rounded-xl active:scale-90"><${PlusIcon} size=${14}/></button>
+          <button type="button" onClick=${() => { triggerHaptic('light'); setRecipeDraft(p => ({ ...p, servings: (p.servings || 1) + 1 })); }} className="p-2 bg-brand-500 text-slate-950 rounded-xl active:scale-90"><${PlusIcon} size=${14}/></button>
         </div>
       </div>
 
@@ -2484,6 +2504,7 @@ ${showRecipeModal && (() => {
                     <div
                       key=${h.name}
                       onClick=${() => {
+                        triggerHaptic('light');
                         setDraftSelectedFood(h);
                         setDraftIngSearch(h.name);
                         setDraftIngGrams(portionAmount);
@@ -2555,6 +2576,7 @@ ${showRecipeModal && (() => {
 
                 <button
                   onClick=${() => {
+                    triggerHaptic('light');
                     if (!draftSelectedFood && draftIngSearch.trim()) {
                       setDraftSelectedFood({
                         name: draftIngSearch.trim(),
@@ -2600,6 +2622,7 @@ ${showRecipeModal && (() => {
 
 ${showActivityModal && html`
   <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => {
+    triggerHaptic('light');
     setShowActivityModal(false);
     setActivityDraft(null);
     setActivityStep('input');
@@ -2610,12 +2633,12 @@ ${showActivityModal && html`
         <${ZapIcon} className="text-amber-400" size=${22}/> KI-Aktivitäts-Tracker
       </h3>
       <button type="button" onClick=${() => {
+        triggerHaptic('light');
         setShowActivityModal(false);
         setActivityDraft(null);
         setActivityStep('input');
       }} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white hover:text-amber-400">
-        <${XIcon} size=${20}/>
-      </button>
+        <${XIcon} size=${20}/></button>
     </div>
 
     ${activityStep === 'input' ? html`
@@ -2637,7 +2660,7 @@ ${showActivityModal && html`
 
         <button
           type="button"
-          onClick=${() => calculateActivityViaAi(activityInput)}
+          onClick=${() => { triggerHaptic('light'); calculateActivityViaAi(activityInput); }}
           disabled=${isActivityLoading}
           className="w-full py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-2xl font-black uppercase tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all shadow-xl text-xs"
         >
@@ -2711,6 +2734,7 @@ ${showActivityModal && html`
         <div className="p-5 bg-slate-900/90 rounded-[2rem] border border-amber-500/30 space-y-4">
           <div className="flex items-center gap-3.5">
             <button onClick=${() => {
+              triggerHaptic('light');
               const input = prompt("Wähle ein Emoji:", activityDraft?.emoji || "⚡");
               if (input) {
                 const newEmoji = [...input.trim()][0];
@@ -2779,7 +2803,7 @@ ${showActivityModal && html`
           </button>
           <button
             type="button"
-            onClick=${() => setActivityStep('input')}
+            onClick=${() => { triggerHaptic('light'); setActivityStep('input'); }}
             className="w-full py-2.5 text-slate-500 hover:text-white font-bold text-xs uppercase tracking-widest transition-colors"
           >
             Zurück / Neu beschreiben
@@ -2791,15 +2815,18 @@ ${showActivityModal && html`
 `}
 
 ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => {
+    triggerHaptic('light');
     setShowAiModal(false);
     setAiImage(null);
   }}/><div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10"><div className="flex justify-between items-center"><h3 className="text-xl font-black flex items-center gap-3"><${CameraIcon} className="text-brand-400"/> Foto-Info</h3><button type="button" onClick=${() => {
+    triggerHaptic('light');
     setShowAiModal(false);
     setAiImage(null);
   }} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button></div><img src=${aiImage} className="w-full h-24 object-cover rounded-3xl border border-white/10 shadow-2xl"/><textarea placeholder="Was genau ist zu sehen?..." value=${aiDesc} onChange=${e => setAiDesc(e.target.value)} onBlur=${() => window.scrollTo(0, 0)} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none text-sm h-20 font-medium text-white shadow-inner"/><div className="flex flex-col gap-3"><button type="button" onPointerDown=${handleSafeAction(() => !isThinking && askGemini(aiDesc, aiImage))} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all touch-manipulation shadow-xl">${isThinking ? html`<${LoaderIcon} size=${20}/>` : html`<${CheckIcon} size=${20}/> Absenden`}</button><button type="button" onClick=${() => {
+    triggerHaptic('light');
     setShowAiModal(false);
     setAiImage(null);
-  }} className="w-full py-2 text-slate-500 font-bold text-xs uppercase tracking-widest">Abbrechen</button></div></div>`}${view === 'profile' && html`<div className="animate-in slide-in-from-right duration-300"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => setView('dashboard')} className="p-4 glass-card rounded-2xl active:scale-90"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Ziele</h2></div><div className="glass-card p-8 rounded-[3rem] space-y-6 shadow-2xl border border-white/10 overflow-y-auto max-h-[75vh]">
+  }} className="w-full py-2 text-slate-500 font-bold text-xs uppercase tracking-widest">Abbrechen</button></div></div>`}${view === 'profile' && html`<div className="animate-in slide-in-from-right duration-300"><div className="flex items-center gap-4 mb-10 mt-4"><button onClick=${() => { triggerHaptic('light'); setView('dashboard'); }} className="p-4 glass-card rounded-2xl active:scale-90"><${ArrowLeftIcon} size=${24}/></button><h2 className="text-3xl font-black tracking-tight text-white">Ziele</h2></div><div className="glass-card p-8 rounded-[3rem] space-y-6 shadow-2xl border border-white/10 overflow-y-auto max-h-[75vh]">
   
     <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5 mb-3"><span>🤖</span> KI-Ziele-Assistent</h4>
     <div className="grid grid-cols-2 gap-3">
@@ -2867,6 +2894,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
     ...user,
     geminiApiKey: e.target.value
   })} className="w-full p-4 bg-slate-800 rounded-2xl font-mono text-xs border border-white/5 text-white shadow-inner"/></div><button onClick=${() => {
+    triggerHaptic('light');
     if (confirm("App zurücksetzen?")) {
       localStorage.clear();
       window.location.reload();
@@ -2874,6 +2902,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   }} className="w-full bg-rose-500/5 border border-rose-500/20 text-rose-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest mt-4 active:bg-rose-500/10 transition-all">Reset</button>
   <div className="flex gap-3 mt-4">
     <button onClick=${() => {
+      triggerHaptic('light');
       const data = {
         user: JSON.parse(localStorage.getItem('kTrackUser') || '{}'),
         aiGoalForm: JSON.parse(localStorage.getItem('kTrackAiGoalForm') || '{}'),
@@ -2896,7 +2925,10 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }} className="flex-1 bg-slate-800/50 border border-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:bg-slate-800 transition-all">Exportieren</button>
-    <button onClick=${() => document.getElementById('import-file').click()} className="flex-1 bg-slate-800/50 border border-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:bg-slate-800 transition-all">Importieren</button>
+    <button onClick=${() => {
+      triggerHaptic('light');
+      document.getElementById('import-file').click();
+    }} className="flex-1 bg-slate-800/50 border border-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:bg-slate-800 transition-all">Importieren</button>
     <input type="file" id="import-file" accept=".json" className="hidden" onChange=${(e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2934,10 +2966,11 @@ ${showCalendarModal && (() => {
   const monthNames = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
   return html`
-    <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => setShowCalendarModal(false)}/>
+    <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => { triggerHaptic('light'); setShowCalendarModal(false); }}/>
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-[410] glass-card rounded-[3rem] p-6 space-y-4 animate-in slide-up duration-300 shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <button onClick=${() => {
+          triggerHaptic('light');
           if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(calendarYear - 1); }
           else { setCalendarMonth(calendarMonth - 1); }
         }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${ArrowLeftIcon} size=${16}/></button>
@@ -2953,6 +2986,7 @@ ${showCalendarModal && (() => {
           }} className="text-[10px] font-black uppercase tracking-wider text-brand-400 bg-brand-500/10 px-3 py-0.5 rounded-full hover:bg-brand-500/20 active:scale-95 transition-all mt-0.5">Heute</button>
         </div>
         <button onClick=${() => {
+          triggerHaptic('light');
           if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(calendarYear + 1); }
           else { setCalendarMonth(calendarMonth + 1); }
         }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${ArrowRightIcon} size=${16}/></button>
@@ -2997,11 +3031,11 @@ ${showCalendarModal && (() => {
 })()}
 
 ${showAiCoach && html`
-  <div className="fixed inset-0 bg-slate-950/95 z-[400] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => !isAiCoachLoading && setShowAiCoach(false)}>
+  <div className="fixed inset-0 bg-slate-950/95 z-[400] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => { if (!isAiCoachLoading) { triggerHaptic('light'); setShowAiCoach(false); } }}>
     <div className="w-full max-w-md glass-card rounded-[2.5rem] p-6 space-y-5 animate-in zoom-in duration-200 overflow-y-auto max-h-[85vh]" onClick=${e => e.stopPropagation()}>
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-black flex items-center gap-3"><${SparklesIcon} className="text-brand-400"/> Ernährungs-Coach</h3>
-        <button onClick=${() => !isAiCoachLoading && setShowAiCoach(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
+        <button onClick=${() => { if (!isAiCoachLoading) { triggerHaptic('light'); setShowAiCoach(false); } }} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
       </div>
       
       ${!aiCoachResult && !isAiCoachLoading && html`
@@ -3059,7 +3093,7 @@ ${showAiCoach && html`
               </ul>
             </div>
           </div>
-          <button onClick=${() => setAiCoachResult(null)} className="w-full py-4 text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-800 rounded-2xl active:scale-95 transition-all">Neue Analyse</button>
+          <button onClick=${() => { triggerHaptic('light'); setAiCoachResult(null); }} className="w-full py-4 text-slate-500 font-bold text-xs uppercase tracking-widest bg-slate-800 rounded-2xl active:scale-95 transition-all">Neue Analyse</button>
         </div>
       `}
     </div>
