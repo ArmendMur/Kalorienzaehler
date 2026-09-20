@@ -112,6 +112,7 @@ const LoaderIcon = p => html`<${Icon} d="M21 12a9 9 0 1 1-6.219-8.56" ...${p} cl
 const FlashlightIcon = p => html`<${Icon} d="M18 6c0 2-2 4-2 6v4a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-4c0-2-2-4-2-6V2h12v4ZM10 2v4M14 2v4M12 12v2" ...${p}/>`;
 const BookIcon = p => html`<${Icon} d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5ZM6 6h10M6 10h10" ...${p}/>`;
 const ZapIcon = p => html`<${Icon} d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" ...${p}/>`;
+const EditIcon = p => html`<${Icon} d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" ...${p}/>`;
 
 // --- HELPERS ---
 const generateId = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
@@ -425,14 +426,18 @@ const AnimatedNumber = ({ value }) => {
     if (start === end) return;
     let duration = 800;
     let startTimestamp = null;
+    let rafId = null;
     const step = (timestamp) => {
       if (!startTimestamp) startTimestamp = timestamp;
       const progress = Math.min((timestamp - startTimestamp) / duration, 1);
       setDisplay(Math.floor(start + (end - start) * progress));
-      if (progress < 1) window.requestAnimationFrame(step);
+      if (progress < 1) rafId = window.requestAnimationFrame(step);
       else setDisplay(end);
     };
-    window.requestAnimationFrame(step);
+    rafId = window.requestAnimationFrame(step);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, [value]);
   return display;
 };
@@ -457,6 +462,7 @@ const ProgressRing = React.memo(({
     let endB = burnedKcal;
     let duration = 850;
     let startTimestamp = null;
+    let rafId = null;
 
     const step = (timestamp) => {
       if (!startTimestamp) startTimestamp = timestamp;
@@ -467,13 +473,16 @@ const ProgressRing = React.memo(({
       setAnimBurned(startB + (endB - startB) * ease);
 
       if (progress < 1) {
-        window.requestAnimationFrame(step);
+        rafId = window.requestAnimationFrame(step);
       } else {
         setAnimConsumed(endC);
         setAnimBurned(endB);
       }
     };
-    window.requestAnimationFrame(step);
+    rafId = window.requestAnimationFrame(step);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+    };
   }, [consumedKcal, burnedKcal]);
 
   const effectiveTarget = baseTarget + animBurned;
@@ -806,6 +815,33 @@ function App() {
     localStorage.setItem('kTrackActivityHistory', JSON.stringify(activityHistory));
   }, [activityHistory]);
 
+  const [hiddenSavedFoods, setHiddenSavedFoods] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kTrackHiddenFoods');
+      return saved && saved !== "null" ? JSON.parse(saved) : [];
+    } catch(e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('kTrackHiddenFoods', JSON.stringify(hiddenSavedFoods));
+  }, [hiddenSavedFoods]);
+
+  const deleteSavedFood = (foodName) => {
+    if (!foodName) return;
+    const lowerName = String(foodName).trim().toLowerCase();
+    setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => (i?.name || '').trim().toLowerCase() !== lowerName));
+    setHiddenSavedFoods(prev => {
+      const safe = Array.isArray(prev) ? prev : [];
+      if (!safe.includes(lowerName)) {
+        return [...safe, lowerName];
+      }
+      return safe;
+    });
+    triggerHaptic('delete');
+  };
+
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [apiResults, setApiResults] = useState([]);
@@ -881,6 +917,21 @@ function App() {
       emoji: '🥗',
       servings: 1,
       ingredients: []
+    });
+    setDraftIngSearch('');
+    setDraftIngGrams(100);
+    setDraftSelectedFood(null);
+    setShowRecipeModal(true);
+  };
+
+  const openEditRecipe = (recipe) => {
+    if (!recipe) return;
+    setRecipeDraft({
+      id: recipe.id || generateId(),
+      name: recipe.name || '',
+      emoji: recipe.emoji || '🥗',
+      servings: recipe.servings || 1,
+      ingredients: Array.isArray(recipe.ingredients) ? [...recipe.ingredients] : []
     });
     setDraftIngSearch('');
     setDraftIngGrams(100);
@@ -1090,13 +1141,14 @@ function App() {
               const key = it.name.trim().toLowerCase();
               const existing = map.get(key);
               const count = (existing?.count || 0) + 1;
-              const baseCal = Number(it.baseCalories ?? (it.amount ? (it.calories / (it.amount / 100)) : it.calories) ?? 0);
-              const baseP = Number(it.baseProtein ?? (it.amount ? (it.protein / (it.amount / 100)) : it.protein) ?? 0);
-              const baseC = Number(it.baseCarbs ?? (it.amount ? (it.carbs / (it.amount / 100)) : it.carbs) ?? 0);
-              const baseS = Number(it.baseSugar ?? (it.amount ? (it.sugar / (it.amount / 100)) : it.sugar) ?? 0);
-              const baseF = Number(it.baseFat ?? (it.amount ? (it.fat / (it.amount / 100)) : it.fat) ?? 0);
-              const baseSF = Number(it.baseSaturatedFat ?? (it.amount ? (it.saturatedFat / (it.amount / 100)) : it.saturatedFat) ?? 0);
-              const baseUF = Number(it.baseUnsaturatedFat ?? (it.amount ? (it.unsaturatedFat / (it.amount / 100)) : it.unsaturatedFat) ?? 0);
+              const actualAmount = it.amount || (it.amountFactor ? Math.round(it.amountFactor * 100) : null);
+              const baseCal = Number(it.baseCalories ?? (actualAmount ? (it.calories / (actualAmount / 100)) : it.calories) ?? 0);
+              const baseP = Number(it.baseProtein ?? (actualAmount ? (it.protein / (actualAmount / 100)) : it.protein) ?? 0);
+              const baseC = Number(it.baseCarbs ?? (actualAmount ? (it.carbs / (actualAmount / 100)) : it.carbs) ?? 0);
+              const baseS = Number(it.baseSugar ?? (actualAmount ? (it.sugar / (actualAmount / 100)) : it.sugar) ?? 0);
+              const baseF = Number(it.baseFat ?? (actualAmount ? (it.fat / (actualAmount / 100)) : it.fat) ?? 0);
+              const baseSF = Number(it.baseSaturatedFat ?? (actualAmount ? (it.saturatedFat / (actualAmount / 100)) : it.saturatedFat) ?? 0);
+              const baseUF = Number(it.baseUnsaturatedFat ?? (actualAmount ? (it.unsaturatedFat / (actualAmount / 100)) : it.unsaturatedFat) ?? 0);
 
               map.set(key, {
                 id: it.id || generateId(),
@@ -1119,7 +1171,7 @@ function App() {
                 baseUnsaturatedFat: baseUF,
                 unitName: it.unitName || existing?.unitName,
                 pieceWeight: it.pieceWeight || existing?.pieceWeight,
-                lastAmount: it.amount || existing?.lastAmount || 100,
+                lastAmount: actualAmount || existing?.lastAmount || 100,
                 count: count
               });
             }
@@ -1162,8 +1214,9 @@ function App() {
       });
     }
 
-    return Array.from(map.values());
-  }, [allLogs, itemHistory, recipes]);
+    const hiddenSet = new Set((hiddenSavedFoods || []).map(s => String(s).toLowerCase().trim()));
+    return Array.from(map.values()).filter(item => item?.name && !hiddenSet.has(item.name.toLowerCase().trim()));
+  }, [allLogs, itemHistory, recipes, hiddenSavedFoods]);
 
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -1388,13 +1441,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setAiCoachResult(null);
     try {
       const days = [];
-      const start = new Date(aiCoachStart);
-      const end = new Date(aiCoachEnd);
-      if (end < start) throw new Error("Das Enddatum darf nicht vor dem Startdatum liegen.");
+      if (aiCoachEnd < aiCoachStart) throw new Error("Das Enddatum darf nicht vor dem Startdatum liegen.");
       
       for (const date in allLogs) {
-         const d = new Date(date);
-         if (d >= start && d <= end && allLogs[date].items && allLogs[date].items.length > 0) {
+         if (date >= aiCoachStart && date <= aiCoachEnd && allLogs[date].items && allLogs[date].items.length > 0) {
            days.push(allLogs[date]);
          }
       }
@@ -1552,8 +1602,19 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           emoji: emoji,
           isBarcode: true
         };
+        let parsedPortion = 100;
+        if (p.serving_quantity) {
+          const q = parseFloat(String(p.serving_quantity).replace(',', '.'));
+          if (!isNaN(q) && q > 0) parsedPortion = q;
+        } else if (p.serving_size) {
+          const match = String(p.serving_size).match(/([0-9]+([.,][0-9]+)?)/);
+          if (match) {
+            const q = parseFloat(match[1].replace(',', '.'));
+            if (!isNaN(q) && q > 0) parsedPortion = q;
+          }
+        }
         setSelectedFood(item);
-        setAmount(Number(p.serving_quantity) || 100);
+        setAmount(Math.round(parsedPortion));
       } else {
         alert("Produkt nicht gefunden.");
       }
@@ -1721,6 +1782,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     const entry = {
       name: baseProps.name,
       instanceId: editingInstanceId || generateId(),
+      amount: safeAmount,
       amountFactor: factor,
       amountDisplay: unitInfo && entryUnitMode === 'unit' && countDisplay
         ? `${countDisplay} ${unitInfo.unitName} (${safeAmount}g)`
@@ -1777,6 +1839,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         }, ...filtered].slice(0, 50);
       });
     }
+    setHiddenSavedFoods(prev => (Array.isArray(prev) ? prev : []).filter(n => n !== baseProps.name.toLowerCase().trim()));
     triggerSuccessToast('Gespeichert!');
     setView('dashboard');
     setSearchQuery('');
@@ -2199,8 +2262,23 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                     <div className="text-[10px] font-black text-slate-500 uppercase truncate">${rec.totalWeight || rec.pieceWeight || 100}g | ${rec.totalCalories || rec.calories} kcal</div>
                   </div>
                 </div>
-                <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
-                  <${PlusIcon} size=${16}/>
+                <div className="flex items-center gap-1.5 ml-2" onClick=${e => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick=${() => { triggerHaptic('light'); openEditRecipe(rec); }}
+                    className="p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl border border-white/5 active:scale-90 transition-all"
+                    title="Rezept bearbeiten"
+                  >
+                    <${EditIcon} size=${15}/>
+                  </button>
+                  <button
+                    type="button"
+                    onClick=${() => selectFood(rec)}
+                    className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm active:scale-90 transition-all"
+                    title="Hinzufügen"
+                  >
+                    <${PlusIcon} size=${16}/>
+                  </button>
                 </div>
               </div>
             </${SwipeableItem}>
@@ -2213,7 +2291,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           <${SwipeableItem}
             key=${item.name}
             onSelect=${() => selectFood(item)}
-            onDelete=${() => setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => i.name !== item.name))}
+            onDelete=${() => deleteSavedFood(item.name)}
           >
             <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
               <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -2247,7 +2325,11 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
               key=${f.id || f.name}
               onSelect=${() => selectFood(f)}
               onDelete=${() => {
-                setItemHistory(prev => (Array.isArray(prev) ? prev : []).filter(i => i.name !== f.name));
+                if (f.isRecipe) {
+                  setRecipes(prev => prev.filter(r => r.id !== f.id));
+                } else {
+                  deleteSavedFood(f.name);
+                }
               }}
             >
               <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
@@ -2317,7 +2399,7 @@ ${showRecipeModal && (() => {
     <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => setShowRecipeModal(false)}/>
     <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10">
       <div className="flex justify-between items-center">
-        <h3 className="text-xl font-black flex items-center gap-3 text-white">🥗 Rezept erstellen</h3>
+        <h3 className="text-xl font-black flex items-center gap-3 text-white">🥗 ${recipeDraft.id && recipes.some(r => r.id === recipeDraft.id) ? 'Rezept bearbeiten' : 'Rezept erstellen'}</h3>
         <button onClick=${() => setShowRecipeModal(false)} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white"><${XIcon} size=${20}/></button>
       </div>
 
@@ -2510,7 +2592,7 @@ ${showRecipeModal && (() => {
         onClick=${saveRecipeDraft}
         className="w-full py-5 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl"
       >
-        Rezept speichern
+        ${recipeDraft.id && recipes.some(r => r.id === recipeDraft.id) ? 'Rezept aktualisieren' : 'Rezept speichern'}
       </button>
     </div>
   `;
@@ -2799,6 +2881,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
         activityHistory: JSON.parse(localStorage.getItem('kTrackActivityHistory') || '[]'),
         logs: JSON.parse(localStorage.getItem('kTrackAllLogs') || '{}'),
         recipes: JSON.parse(localStorage.getItem('kTrackRecipes') || '[]'),
+        hiddenFoods: JSON.parse(localStorage.getItem('kTrackHiddenFoods') || '[]'),
       };
       const oldLogRaw = localStorage.getItem('kTrackLog');
       if (oldLogRaw && oldLogRaw !== "null") data.oldLog = JSON.parse(oldLogRaw);
@@ -2827,6 +2910,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
           if (data.activityHistory) localStorage.setItem('kTrackActivityHistory', JSON.stringify(data.activityHistory));
           if (data.logs) localStorage.setItem('kTrackAllLogs', JSON.stringify(data.logs));
           if (data.recipes) localStorage.setItem('kTrackRecipes', JSON.stringify(data.recipes));
+          if (data.hiddenFoods) localStorage.setItem('kTrackHiddenFoods', JSON.stringify(data.hiddenFoods));
           alert("Erfolgreich importiert!");
           window.location.reload();
         } catch(err) {
@@ -2856,12 +2940,22 @@ ${showCalendarModal && (() => {
         <button onClick=${() => {
           if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(calendarYear - 1); }
           else { setCalendarMonth(calendarMonth - 1); }
-        }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all"><${ArrowLeftIcon} size=${16}/></button>
-        <h3 className="text-lg font-black text-white">${monthNames[calendarMonth]} ${calendarYear}</h3>
+        }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${ArrowLeftIcon} size=${16}/></button>
+        <div className="flex flex-col items-center">
+          <h3 className="text-lg font-black text-white">${monthNames[calendarMonth]} ${calendarYear}</h3>
+          <button onClick=${() => {
+            triggerHaptic('light');
+            const now = new Date();
+            setCalendarMonth(now.getMonth());
+            setCalendarYear(now.getFullYear());
+            setSelectedDate(getLocalToday());
+            setShowCalendarModal(false);
+          }} className="text-[10px] font-black uppercase tracking-wider text-brand-400 bg-brand-500/10 px-3 py-0.5 rounded-full hover:bg-brand-500/20 active:scale-95 transition-all mt-0.5">Heute</button>
+        </div>
         <button onClick=${() => {
           if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(calendarYear + 1); }
           else { setCalendarMonth(calendarMonth + 1); }
-        }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all"><${ArrowRightIcon} size=${16}/></button>
+        }} className="p-3 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${ArrowRightIcon} size=${16}/></button>
       </div>
       
       <div className="grid grid-cols-7 gap-2 text-center mb-2">
@@ -2979,7 +3073,9 @@ root.render(html`<${App}/>`);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration:', err));
+    navigator.serviceWorker.register('./sw.js?v=2').then(reg => {
+      reg.update().catch(() => {});
+    }).catch(err => console.log('SW registration:', err));
   });
 }
     </script>
