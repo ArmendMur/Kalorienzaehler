@@ -2222,7 +2222,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setActivityStep('preview');
     setShowActivityModal(true);
   }} onDelete=${(instanceId) => setDailyLog(prev => ({...prev, items: prev.items.filter(i => i.instanceId !== instanceId)}))}/>`)}</div>
-</div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300 p-2"><div className="flex items-center gap-4 mb-5 mt-2"><button onClick=${() => {
+</div></div>`}${view === 'addFood' && html`<div className="animate-in slide-in-from-bottom duration-300"><div className="flex items-center gap-4 mb-5 mt-2"><button onClick=${() => {
     triggerHaptic('light');
     setView('dashboard');
     setSearchQuery('');
@@ -2249,7 +2249,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     }
   }}/></div>
   ${!searchQuery.trim() ? html`<div className="space-y-3">
-    <div className="flex gap-2 p-1 bg-slate-900 rounded-2xl border border-white/5 mx-1">
+    <div className="flex gap-2 p-1 bg-slate-900 rounded-2xl border border-white/5">
       <button onClick=${() => { triggerHaptic('light'); setActiveTab('frequent'); }} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'frequent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>⭐ Häufig</button>
       <button onClick=${() => { triggerHaptic('light'); setActiveTab('recent'); }} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'recent' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>🕒 Zuletzt</button>
       <button onClick=${() => { triggerHaptic('light'); setActiveTab('recipes'); }} className=${`flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'recipes' ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-500 hover:text-slate-300'}`}>🥗 Rezepte</button>
