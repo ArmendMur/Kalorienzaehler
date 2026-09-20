@@ -124,7 +124,10 @@ const getItemDisplay = (item, isLarge = false) => {
 const getSmartFoodUnit = (food) => {
   if (!food) return null;
   if (food.unitName && food.pieceWeight) {
-    return { unitName: food.unitName, pieceWeight: Number(food.pieceWeight) };
+    const uName = String(food.unitName).trim();
+    if (uName.toLowerCase() !== 'portion' || food.isRecipe) {
+      return { unitName: uName, pieceWeight: Number(food.pieceWeight) };
+    }
   }
   const name = (food.name || '').toLowerCase();
   
@@ -146,7 +149,6 @@ const getSmartFoodUnit = (food) => {
   if (/\b(becher|joghurtbecher)\b/i.test(name)) return { unitName: 'Becher', pieceWeight: 150 };
   if (/\b(pizzastück|pizza)\b/i.test(name) && !/ganz/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
   if (/\b(wiener|würstchen|bratwurst)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
-  if (food.estimatedPortionWeight) return { unitName: 'Portion', pieceWeight: Number(food.estimatedPortionWeight) };
 
   return null;
 };
@@ -814,11 +816,21 @@ function App() {
   const [editingInstanceId, setEditingInstanceId] = useState(null);
   const [showDetails, setShowDetails] = useState(null);
   const [amount, setAmount] = useState(100);
+  const [entryUnitMode, setEntryUnitMode] = useState('unit');
+  const [unitStepSize, setUnitStepSize] = useState(1);
   const [aiImage, setAiImage] = useState(null);
   const [aiDesc, setAiDesc] = useState('');
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('Gespeichert!');
+
+  useEffect(() => {
+    if (selectedFood) {
+      const u = getSmartFoodUnit(selectedFood);
+      setEntryUnitMode(u ? 'unit' : 'gram');
+      setUnitStepSize(1);
+    }
+  }, [selectedFood?.name, selectedFood?.instanceId, selectedFood?.id]);
 
   const triggerSuccessToast = (msg = 'Gespeichert!') => {
     setSuccessMessage(msg);
@@ -1427,8 +1439,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     try {
       const prompt = `Analysiere folgendes Essen (Bild und/oder Text): ${text || "das Bild"}. 
                     WICHTIGSTE REGEL: Gib IMMER und AUSNAHMSLOS die Nährwerte für exakt 100 Gramm an!
-                    Schätze bei 'estimatedPortionWeight' das Gewicht der GESAMTEN beschriebenen/sichtbaren Portion ab.
-                    SMARTE EINHEIT: Wenn es sich um zählbare Stückgüter handelt (z.B. Eier, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Burger, Dosen), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 55 für 1 Ei, 20 für 1 Nugget, 30 für 1 Scheibe Toast) an. Bei Schüttgut wie Reis, Haferflocken oder Quark setze 'unitName': null, 'pieceWeight': null.
+                    Schätze bei 'estimatedPortionWeight' das ungefähre Gesamtgewicht der gesamten Mahlzeit/Portion in Gramm (z.B. 350 für einen Teller Nudeln, 140 für 7 Nuggets).
+                    SMARTE EINHEIT:
+                    - Wenn es sich um echt zählbare Stückgüter handelt (z.B. Eier, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Burger, Dosen, Würstchen), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 20 für 1 Nugget, 55 für 1 Ei, 30 für 1 Scheibe Toast) an.
+                    - Bei Schüttgut, Tellern, Schüsseln, gemischten Mahlzeiten (z.B. Pasta, Reis mit Beilage, Bowls, Curry, Salat, Müsli, Steak, Auflauf) setze 'unitName': null und 'pieceWeight': null. Verwende NIEMALS "Portion", "Teller", "Schale" oder "Mahlzeit" als unitName!
                     Wähle GENAU EIN passendes Emoji aus.
                     Gib AUSSCHLIESSLICH ein einziges, valides JSON-Objekt zurück.
                     Format: {"name":"string", "calories":int, "protein":float, "carbs":float, "sugar":float, "fat":float, "saturatedFat":float, "estimatedPortionWeight":int, "unitName":string|null, "pieceWeight":int|null, "emoji":"string"}`;
@@ -1474,7 +1488,18 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       json.fat = Number(json.fat) || 0;
       json.saturatedFat = Number(json.saturatedFat) || 0;
       if (json.pieceWeight) json.pieceWeight = Number(json.pieceWeight);
-      if (json.unitName) json.unitName = String(json.unitName);
+      if (json.unitName) {
+        json.unitName = String(json.unitName).trim();
+        if (
+          json.unitName.toLowerCase().includes('portion') || 
+          json.unitName.toLowerCase().includes('teller') || 
+          json.unitName.toLowerCase().includes('schale') || 
+          json.unitName.toLowerCase().includes('mahlzeit')
+        ) {
+          json.unitName = null;
+          json.pieceWeight = null;
+        }
+      }
 
       // Sicherstellen, dass nur EIN Emoji genommen wird
       if (json.emoji) {
@@ -1506,6 +1531,8 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       image: food.image,
       isBarcode: food.isBarcode,
       isAi: food.isAi,
+      unitName: food.unitName,
+      pieceWeight: food.pieceWeight,
       calories: Math.round(Number(food.baseCalories ?? food.calories ?? 0)),
       protein: Math.round((Number(food.baseProtein ?? food.protein ?? 0)) * 10) / 10,
       carbs: Math.round((Number(food.baseCarbs ?? food.carbs ?? 0)) * 10) / 10,
@@ -1532,7 +1559,9 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       emoji: item.emoji,
       image: item.image,
       isBarcode: item.isBarcode,
-      isAi: item.isAi
+      isAi: item.isAi,
+      unitName: item.unitName,
+      pieceWeight: item.pieceWeight
     });
     setAmount(Math.round(item.amountFactor * 100));
     setEditingInstanceId(item.instanceId);
@@ -1553,11 +1582,21 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       saturatedFat: Number(food.saturatedFat || 0)
     };
     baseProps.unsaturatedFat = food.unsaturatedFat !== undefined ? Number(food.unsaturatedFat || 0) : Math.max(0, baseProps.fat - baseProps.saturatedFat);
+    
+    const unitInfo = getSmartFoodUnit(food);
+    const rawPieceCount = unitInfo ? (safeAmount / unitInfo.pieceWeight) : null;
+    const pieceCount = rawPieceCount ? Math.round(rawPieceCount * 10) / 10 : null;
+    const countDisplay = pieceCount ? (Number.isInteger(pieceCount) ? pieceCount : pieceCount.toString().replace('.', ',')) : null;
+
     const entry = {
       name: baseProps.name,
       instanceId: editingInstanceId || generateId(),
       amountFactor: factor,
-      amountDisplay: `${safeAmount}g`,
+      amountDisplay: unitInfo && entryUnitMode === 'unit' && countDisplay
+        ? `${countDisplay} ${unitInfo.unitName} (${safeAmount}g)`
+        : `${safeAmount}g`,
+      unitName: unitInfo?.unitName || null,
+      pieceWeight: unitInfo?.pieceWeight || null,
       emoji: baseProps.emoji,
       isBarcode: food.isBarcode,
       image: food.isAi ? null : food.image,
@@ -1615,7 +1654,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setSelectedFood(null);
     setEditingInstanceId(null);
     setAmount(100);
-  }, [amount, editingInstanceId, setDailyLog, setItemHistory]);
+  }, [amount, editingInstanceId, entryUnitMode, setDailyLog, setItemHistory]);
   return html`<div className="max-w-md mx-auto min-h-screen bg-slate-950 text-slate-100 px-6 pb-24 pt-[env(safe-area-inset-top,2.5rem)] relative overflow-hidden">
     ${showSuccess && html`<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[500] bg-brand-500 text-slate-950 px-8 py-4 rounded-full font-black flex items-center gap-3 shadow-2xl animate-success-fade"><${CheckIcon} size=${24} strokeWidth=${3}/> ${successMessage}</div>`}
     ${showDetails && html`<div className="fixed inset-0 bg-slate-950/95 z-[200] flex items-center justify-center p-6 backdrop-blur-xl animate-in zoom-in duration-200">
@@ -1702,7 +1741,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     </div>`}
     ${selectedFood && (() => {
       const unitInfo = getSmartFoodUnit(selectedFood);
-      const pieceCount = unitInfo ? Math.max(1, Math.round((Number(amount) || unitInfo.pieceWeight) / unitInfo.pieceWeight)) : null;
+      const isUnitMode = Boolean(unitInfo && entryUnitMode === 'unit');
+      const rawCount = unitInfo ? (Number(amount) || 0) / unitInfo.pieceWeight : 1;
+      const roundedCount = unitInfo ? Math.round(rawCount * 10) / 10 : 1;
+      const displayCount = roundedCount === 0 ? '' : (Number.isInteger(roundedCount) ? roundedCount : roundedCount.toString().replace('.', ','));
+      const activeStep = unitStepSize || 1;
+      const stepWeight = unitInfo ? (unitInfo.pieceWeight * activeStep) : 50;
 
       return html`<div className="fixed inset-0 bg-slate-950/90 z-[450] backdrop-blur-sm animate-in fade-in duration-300" onClick=${() => {
         setSelectedFood(null);
@@ -1723,35 +1767,174 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             setEditingInstanceId(null);
           }} className="shrink-0 p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
         </div>
-        <div className="space-y-6 mb-8">
+        <div className="space-y-4 mb-6">
           ${unitInfo ? html`
-            <div className="flex items-center gap-4">
-              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount(Math.max(unitInfo.pieceWeight, (amount || unitInfo.pieceWeight) - unitInfo.pieceWeight)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem]">
+            <div className="flex items-center justify-center">
+              <div className="bg-slate-900/90 p-1 rounded-2xl border border-white/10 flex items-center gap-1 w-full max-w-[280px]">
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setEntryUnitMode('unit'); }}
+                  className=${`flex-1 py-1.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${isUnitMode ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <span>${selectedFood.emoji || '📦'}</span>
+                  <span>${unitInfo.unitName}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setEntryUnitMode('gram'); }}
+                  className=${`flex-1 py-1.5 px-3 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 ${!isUnitMode ? 'bg-brand-500 text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                >
+                  <span>⚖️</span>
+                  <span>Gramm</span>
+                </button>
+              </div>
+            </div>
+          ` : ''}
+
+          ${isUnitMode ? html`
+            <div className="flex items-center gap-3 sm:gap-4">
+              <button
+                type="button"
+                onClick=${() => {
+                  triggerHaptic('light');
+                  const newAmt = Math.max(stepWeight, Math.round(((amount || stepWeight) - stepWeight) * 10) / 10);
+                  setAmount(newAmt);
+                }}
+                className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.8rem]"
+              >
                 <${MinusIcon} size=${18}/>
-                <span className="text-[9px] font-black uppercase text-slate-400">-1 ${unitInfo.unitName}</span>
+                <span className="text-[9px] font-black uppercase text-slate-400">-${activeStep === 0.5 ? '0,5' : activeStep} ${unitInfo.unitName}</span>
               </button>
               <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
-                <div className="text-xl sm:text-2xl font-black text-white">${pieceCount} ${unitInfo.unitName}</div>
-                <div className="flex items-center gap-1 text-slate-400 text-xs font-bold mt-0.5">
-                  <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center font-bold text-slate-300 outline-none w-14 border-b border-white/10 focus:border-brand-400"/>
-                  <span>g</span>
+                <div className="flex items-center justify-center gap-1.5">
+                  <input
+                    type="number"
+                    step="any"
+                    min="0"
+                    inputMode="decimal"
+                    value=${roundedCount === 0 ? '' : roundedCount}
+                    placeholder="0"
+                    onFocus=${e => setTimeout(() => e.target.select(), 50)}
+                    onChange=${e => {
+                      const val = e.target.value === '' ? 0 : Number(e.target.value);
+                      setAmount(isNaN(val) ? 0 : Math.round(val * unitInfo.pieceWeight * 10) / 10);
+                    }}
+                    className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-20 border-b border-white/10 focus:border-brand-400"
+                  />
+                  <span className="text-base sm:text-lg font-black text-white">${unitInfo.unitName}</span>
+                </div>
+                <div className="flex items-center gap-1 text-slate-400 text-xs font-bold mt-1">
+                  <span>≈ ${amount} g</span>
                 </div>
               </div>
-              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + unitInfo.pieceWeight); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.5rem]">
+              <button
+                type="button"
+                onClick=${() => {
+                  triggerHaptic('light');
+                  const newAmt = Math.round(((amount || 0) + stepWeight) * 10) / 10;
+                  setAmount(newAmt);
+                }}
+                className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.8rem]"
+              >
                 <${PlusIcon} size=${18}/>
-                <span className="text-[9px] font-black uppercase text-slate-950">+1 ${unitInfo.unitName}</span>
+                <span className="text-[9px] font-black uppercase text-slate-950">+${activeStep === 0.5 ? '0,5' : activeStep} ${unitInfo.unitName}</span>
               </button>
             </div>
-          ` : html`
-            <div className="flex items-center gap-4">
-              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount(Math.max(0, (amount || 0) - 50)); }} className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation"><${MinusIcon} size=${20}/></button>
-              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex items-center justify-center gap-2 focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
-                <input type="number" inputMode="decimal" value=${amount === 0 ? '' : amount} placeholder="0" onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))} className="bg-transparent text-center text-2xl font-black text-white outline-none w-full max-w-[120px]"/>
-                <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
+
+            <div className="flex items-center justify-between px-1 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Schritt:</span>
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setUnitStepSize(1); }}
+                  className=${`px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all ${activeStep === 1 ? 'bg-brand-500/20 border-brand-400 text-brand-300 shadow-sm' : 'bg-slate-900 border-white/10 text-slate-400'}`}
+                >1x</button>
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setUnitStepSize(0.5); }}
+                  className=${`px-2.5 py-1 rounded-lg text-[10px] font-black border transition-all ${activeStep === 0.5 ? 'bg-brand-500/20 border-brand-400 text-brand-300 shadow-sm' : 'bg-slate-900 border-white/10 text-slate-400'}`}
+                >0,5x (½)</button>
               </div>
-              <button type="button" onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 50); }} className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation"><${PlusIcon} size=${20}/></button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setAmount(Math.round(unitInfo.pieceWeight * 0.5 * 10) / 10); }}
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+                >½</button>
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setAmount(unitInfo.pieceWeight); }}
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+                >1x</button>
+                <button
+                  type="button"
+                  onClick=${() => { triggerHaptic('light'); setAmount(unitInfo.pieceWeight * 2); }}
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+                >2x</button>
+              </div>
+            </div>
+          ` : html`
+            <div className="flex items-center gap-3 sm:gap-4">
+              <button
+                type="button"
+                onClick=${() => { triggerHaptic('light'); setAmount(Math.max(0, (amount || 0) - 50)); }}
+                className="p-4 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.8rem]"
+              >
+                <${MinusIcon} size=${20}/>
+                <span className="text-[9px] font-black uppercase text-slate-400">-50g</span>
+              </button>
+              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl p-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
+                <div className="flex items-center justify-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    value=${amount === 0 ? '' : amount}
+                    placeholder="0"
+                    onFocus=${e => setTimeout(() => e.target.select(), 50)}
+                    onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))}
+                    className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-full max-w-[130px]"
+                  />
+                  <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
+                </div>
+                ${unitInfo ? html`
+                  <div className="text-[11px] font-bold text-brand-400/90 mt-0.5">
+                    ≈ ${displayCount} ${unitInfo.unitName}
+                  </div>
+                ` : ''}
+              </div>
+              <button
+                type="button"
+                onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 50); }}
+                className="p-4 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.8rem]"
+              >
+                <${PlusIcon} size=${20}/>
+                <span className="text-[9px] font-black uppercase text-slate-950">+50g</span>
+              </button>
+            </div>
+            <div className="flex items-center justify-center gap-2 px-1">
+              <button
+                type="button"
+                onClick=${() => { triggerHaptic('light'); setAmount(Math.max(0, (amount || 0) - 50)); }}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+              >-50g</button>
+              <button
+                type="button"
+                onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 25); }}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+              >+25g</button>
+              <button
+                type="button"
+                onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 50); }}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+              >+50g</button>
+              <button
+                type="button"
+                onClick=${() => { triggerHaptic('light'); setAmount((amount || 0) + 100); }}
+                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-900 border border-white/10 text-slate-400 hover:text-white active:scale-95 transition-all"
+              >+100g</button>
             </div>
           `}
+        </div>
 
           <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
             <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
