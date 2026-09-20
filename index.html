@@ -2014,10 +2014,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 }}
                 className="py-3 px-3 bg-slate-800 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 text-white touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.4rem]"
               >
-                <${MinusIcon} size=${18}/>
+                <${MinusIcon} size=${20}/>
                 <span className="text-[9px] font-black uppercase text-slate-400">-1 ${unitInfo.unitName}</span>
               </button>
-              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl py-2 px-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
+              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl py-2 px-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1 min-h-[4.5rem]">
                 <div className="flex items-center justify-center gap-1.5">
                   <input
                     type="number"
@@ -2031,12 +2031,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                       const val = e.target.value === '' ? 0 : Number(e.target.value);
                       setAmount(isNaN(val) ? 0 : Math.round(val * unitInfo.pieceWeight * 10) / 10);
                     }}
-                    className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-20 border-b border-white/10 focus:border-brand-400"
+                    className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-24"
                   />
-                  <span className="text-base sm:text-lg font-black text-white">${unitInfo.unitName}</span>
+                  <span className="text-base sm:text-lg font-black text-white pointer-events-none">${unitInfo.unitName}</span>
                 </div>
-                <div className="flex items-center gap-1 text-slate-400 text-xs font-bold mt-0.5">
-                  <span>≈ ${amount} g</span>
+                <div className="text-xs font-bold text-brand-400 mt-0.5">
+                  ≈ ${Number.isInteger(amount) ? amount : Number(amount).toFixed(1).replace(/\.0$/, '').replace('.', ',')} g
                 </div>
               </div>
               <button
@@ -2048,7 +2048,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 }}
                 className="py-3 px-3 bg-brand-500 text-slate-950 rounded-2xl active:scale-90 active:brightness-125 transition-all duration-150 touch-manipulation flex flex-col items-center justify-center gap-0.5 min-w-[4.4rem]"
               >
-                <${PlusIcon} size=${18}/>
+                <${PlusIcon} size=${20}/>
                 <span className="text-[9px] font-black uppercase text-slate-950">+1 ${unitInfo.unitName}</span>
               </button>
             </div>
@@ -2062,8 +2062,8 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 <${MinusIcon} size=${20}/>
                 <span className="text-[9px] font-black uppercase text-slate-400">-50g</span>
               </button>
-              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl py-2 px-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1">
-                <div className="flex items-center justify-center gap-2">
+              <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/15 rounded-2xl py-2 px-3 flex flex-col items-center justify-center focus-within:ring-2 focus-within:ring-brand-400 focus-within:shadow-[0_0_25px_rgba(139,92,246,0.45)] focus-within:border-brand-400/80 transition-all duration-300 flex-1 min-h-[4.5rem]">
+                <div className="flex items-center justify-center gap-1.5">
                   <input
                     type="number"
                     inputMode="decimal"
@@ -2071,12 +2071,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                     placeholder="0"
                     onFocus=${e => setTimeout(() => e.target.select(), 50)}
                     onChange=${e => setAmount(e.target.value === '' ? 0 : Number(e.target.value))}
-                    className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-full max-w-[130px]"
+                    className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-24"
                   />
-                  <span className="text-sm font-bold text-slate-400 pointer-events-none">g</span>
+                  <span className="text-base sm:text-lg font-black text-white pointer-events-none">g</span>
                 </div>
                 ${unitInfo ? html`
-                  <div className="text-[11px] font-bold text-brand-400/90 mt-0.5">
+                  <div className="text-xs font-bold text-brand-400 mt-0.5">
                     ≈ ${displayCount} ${unitInfo.unitName}
                   </div>
                 ` : ''}
