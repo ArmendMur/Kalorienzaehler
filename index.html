@@ -1666,69 +1666,69 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             <button onClick=${() => setShowDetails(null)} className="shrink-0 p-2 bg-slate-800 rounded-full"><${XIcon} size=${20}/></button>
           </div>
         </div>
-        <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
-          <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
-            <div className="border-r border-white/10 px-4 py-2.5 text-xs font-bold text-slate-400">Nährstoff</div>
-            <div className="border-r border-white/10 px-2 py-2.5 text-xs font-bold text-slate-400 text-center">pro 100g</div>
-            <div className="px-3 py-2 text-center leading-tight">
-              <div className="text-[11px] font-bold text-slate-400">Portion</div>
-              <div className="text-slate-400 font-bold text-xs">${showDetails?.amountDisplay || "0g"}</div>
+        <div className="w-full max-w-[310px] mx-auto bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
+          <div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center bg-slate-800/50 border-b border-white/10">
+            <div className="border-r border-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-400 whitespace-nowrap">Nährstoff</div>
+            <div className="border-r border-white/10 px-2 py-1.5 text-xs font-bold text-slate-400 text-center whitespace-nowrap">pro 100g</div>
+            <div className="px-2 py-1 text-center leading-tight">
+              <div className="text-[10px] font-bold text-slate-400 whitespace-nowrap">Portion</div>
+              <div className="text-slate-400 font-bold text-xs whitespace-nowrap">${showDetails?.amountDisplay || "0g"}</div>
             </div>
           </div>
-          <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-brand-400">🔥 Energie</div>
-  <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400">
+          <div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-brand-400">🔥 Energie</div>
+  <div className="border-r border-white/10 px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400">
     ${Math.round(showDetails?.baseCalories ?? 0)}<span className="text-[10px] pointer-events-none">kcal</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400 bg-slate-900/30">
     ${Math.round(showDetails?.calories ?? 0)}<span className="text-[10px] pointer-events-none">kcal</span>
   </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-fuchsia-400">💪🏼 Protein</div>
-  <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400">
+</div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-fuchsia-400">💪🏼 Protein</div>
+  <div className="border-r border-white/10 px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400">
     ${Number(showDetails?.baseProtein ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400 bg-slate-900/30">
     ${Number(showDetails?.protein ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-400">🍞 Kohlenhydrate</div>
-  <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400">
+</div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-400">🍞 Kohlenhydrate</div>
+  <div className="border-r border-white/10 px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400">
     ${Number(showDetails?.baseCarbs ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400 bg-slate-900/30">
     ${Number(showDetails?.carbs ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-500"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🍭 Zucker</div>
-  <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500">
+</div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-500"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🍭 Zucker</div>
+  <div className="border-r border-white/10 px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500">
     ${Number(showDetails?.baseSugar ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500 bg-slate-900/30">
     ${Number(showDetails?.sugar ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
+</div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
   <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400">
     ${Number(showDetails?.baseFat ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400 bg-slate-900/30">
     ${Number(showDetails?.fat ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-200"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🌱 ungesättigt</div>
-  <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200">
+</div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-200"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🌱 ungesättigt</div>
+  <div className="border-r border-white/10 px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200">
     ${Number(showDetails?.baseUnsaturatedFat !== undefined ? showDetails.baseUnsaturatedFat : Math.max(0, (Number(showDetails?.baseFat) || 0) - (Number(showDetails?.baseSaturatedFat) || 0))).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200 bg-slate-900/30">
     ${Number(showDetails?.unsaturatedFat !== undefined ? showDetails.unsaturatedFat : Math.max(0, (Number(showDetails?.fat) || 0) - (Number(showDetails?.saturatedFat) || 0))).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-</div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center ">
-  <div className="border-r border-white/10 px-4 py-2.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
-  <div className="border-r border-white/10 px-2 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600">
+</div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center ">
+  <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
+  <div className="border-r border-white/10 px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600">
     ${Number(showDetails?.baseSaturatedFat ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
-  <div className="px-3 py-2.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600 bg-slate-900/30">
+  <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600 bg-slate-900/30">
     ${Number(showDetails?.saturatedFat ?? 0).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
   </div>
 </div>
@@ -1880,90 +1880,90 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           `}
         </div>
 
-          <div className="bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
-            <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center bg-slate-800/50 border-b border-white/10">
-              <div className="border-r border-white/10 px-3.5 py-1.5 text-xs font-bold text-slate-400">Nährstoff</div>
-              <div className="border-r border-white/10 px-2 py-1.5 text-xs font-bold text-slate-400 text-center">pro 100g ✏️</div>
-              <div className="px-3 py-1.5 text-center leading-tight">
-                <div className="text-[11px] font-bold text-slate-400">Portion</div>
-                <div className="text-slate-400 font-bold text-xs">${amount}g</div>
+          <div className="w-full max-w-[310px] mx-auto bg-slate-900/60 rounded-2xl border border-white/5 overflow-hidden">
+            <div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center bg-slate-800/50 border-b border-white/10">
+              <div className="border-r border-white/10 px-2.5 py-1.5 text-xs font-bold text-slate-400 whitespace-nowrap">Nährstoff</div>
+              <div className="border-r border-white/10 px-2 py-1.5 text-xs font-bold text-slate-400 text-center whitespace-nowrap">pro 100g ✏️</div>
+              <div className="px-2 py-1 text-center leading-tight">
+                <div className="text-[10px] font-bold text-slate-400 whitespace-nowrap">Portion</div>
+                <div className="text-slate-400 font-bold text-xs whitespace-nowrap">${amount}g</div>
               </div>
             </div>
-            <div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-brand-400">🔥 Energie</div>
+            <div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-brand-400">🔥 Energie</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-brand-400/60 transition-all text-brand-400">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-brand-400/60 transition-all text-brand-400">
         <input type="number" inputMode="decimal" value=${selectedFood?.calories ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, calories: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">kcal</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-brand-400 bg-slate-900/30 transition-all duration-200">
       ${Math.round((Number(selectedFood?.calories ?? 0) || 0) * ((amount || 0) / 100))}<span className="text-[10px] pointer-events-none">kcal</span>
     </div>
-  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-fuchsia-400">💪🏼 Protein</div>
+  </div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-fuchsia-400">💪🏼 Protein</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-fuchsia-400/60 transition-all text-fuchsia-400">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-fuchsia-400/60 transition-all text-fuchsia-400">
         <input type="number" inputMode="decimal" value=${selectedFood?.protein ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, protein: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">g</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-fuchsia-400 bg-slate-900/30 transition-all duration-200">
       ${Number((Number(selectedFood?.protein ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
     </div>
-  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-400">🍞 Kohlenhydrate</div>
+  </div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-400">🍞 Kohlenhydrate</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-400">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-400">
         <input type="number" inputMode="decimal" value=${selectedFood?.carbs ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, carbs: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">g</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-400 bg-slate-900/30 transition-all duration-200">
       ${Number((Number(selectedFood?.carbs ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
     </div>
-  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-500"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🍭 Zucker</div>
+  </div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-blue-500"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🍭 Zucker</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-500">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-blue-400/60 transition-all text-blue-500">
         <input type="number" inputMode="decimal" value=${selectedFood?.sugar ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, sugar: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">g</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-blue-500 bg-slate-900/30 transition-all duration-200">
       ${Number((Number(selectedFood?.sugar ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
     </div>
-  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
+  </div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-400">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-400">
         <input type="number" inputMode="decimal" value=${selectedFood?.fat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, fat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">g</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-400 bg-slate-900/30 transition-all duration-200">
       ${Number((Number(selectedFood?.fat ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
     </div>
-  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center border-b border-white/5">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-200"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🌱 ungesättigt</div>
+  </div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center border-b border-white/5">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-200"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🌱 ungesättigt</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-200">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-200">
         <input type="number" inputMode="decimal" value=${selectedFood?.unsaturatedFat !== undefined ? (typeof selectedFood.unsaturatedFat === 'number' ? Math.round(selectedFood.unsaturatedFat * 10) / 10 : selectedFood.unsaturatedFat) : Math.max(0, Math.round(((Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0)) * 10) / 10)} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, unsaturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">g</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-200 bg-slate-900/30 transition-all duration-200">
       ${Number((Number(selectedFood?.unsaturatedFat !== undefined ? selectedFood.unsaturatedFat : Math.max(0, (Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0))) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
     </div>
-  </div><div className="grid grid-cols-[1.9fr_1.05fr_1.05fr] items-center ">
-    <div className="border-r border-white/10 px-3.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
+  </div><div className="grid grid-cols-[1.32fr_1fr_0.86fr] items-center ">
+    <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
     <div className="border-r border-white/10 p-1">
-      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-2 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-600">
+      <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-600">
         <input type="number" inputMode="decimal" value=${selectedFood?.saturatedFat !== undefined ? (typeof selectedFood.saturatedFat === 'number' ? Math.round(selectedFood.saturatedFat * 10) / 10 : selectedFood.saturatedFat) : 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, saturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
         <span className="text-[10px] pointer-events-none">g</span>
       </div>
     </div>
-    <div className="px-3 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600 bg-slate-900/30 transition-all duration-200">
+    <div className="px-2 py-1.5 flex items-center justify-center gap-0.5 text-center whitespace-nowrap text-xs font-bold text-amber-600 bg-slate-900/30 transition-all duration-200">
       ${Number((Number(selectedFood?.saturatedFat ?? 0) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
     </div>
   </div>
