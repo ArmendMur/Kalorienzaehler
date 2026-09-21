@@ -175,7 +175,66 @@ const resizeImage = file => {
   });
 };
 
-// --- COMPONENTS & HELPERS ---
+// --- AUDIO & HAPTIC SUBSYSTEM (iOS Standalone & PWA Unmute) ---
+
+const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+
+const initAudioSession = () => {
+  if (typeof navigator !== 'undefined' && 'audioSession' in navigator) {
+    try {
+      navigator.audioSession.type = 'playback';
+    } catch(e) {}
+  }
+};
+
+const unlockAudio = () => {
+  initAudioSession();
+  try {
+    const silentEl = new Audio(SILENT_WAV);
+    silentEl.play().catch(() => {});
+
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtxClass) {
+      if (!window._hapticCtx) {
+        window._hapticCtx = new AudioCtxClass();
+      }
+      if (window._hapticCtx.state === 'suspended' || window._hapticCtx.state === 'interrupted') {
+        window._hapticCtx.resume().catch(() => {});
+      }
+      const buffer = window._hapticCtx.createBuffer(1, 1, 22050);
+      const source = window._hapticCtx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(window._hapticCtx.destination);
+      source.start(0);
+    }
+  } catch(e) {}
+};
+
+if (typeof window !== 'undefined') {
+  initAudioSession();
+  const handleFirstGesture = () => {
+    unlockAudio();
+    window.removeEventListener('touchstart', handleFirstGesture, true);
+    window.removeEventListener('touchend', handleFirstGesture, true);
+    window.removeEventListener('pointerdown', handleFirstGesture, true);
+    window.removeEventListener('click', handleFirstGesture, true);
+  };
+  window.addEventListener('touchstart', handleFirstGesture, { capture: true, passive: true });
+  window.addEventListener('touchend', handleFirstGesture, { capture: true, passive: true });
+  window.addEventListener('pointerdown', handleFirstGesture, { capture: true, passive: true });
+  window.addEventListener('click', handleFirstGesture, { capture: true, passive: true });
+
+  const handleForegroundResume = () => {
+    initAudioSession();
+    if (window._hapticCtx && (window._hapticCtx.state === 'suspended' || window._hapticCtx.state === 'interrupted')) {
+      window._hapticCtx.resume().catch(() => {});
+    }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') handleForegroundResume();
+  });
+  window.addEventListener('pageshow', handleForegroundResume);
+}
 
 const triggerHaptic = (type = 'light') => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -184,68 +243,68 @@ const triggerHaptic = (type = 'light') => {
     else navigator.vibrate(15);
   }
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) {
-      if (!window._hapticCtx) {
-        window._hapticCtx = new AudioContext();
-      }
-      const ctx = window._hapticCtx;
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-      const now = ctx.currentTime;
+    initAudioSession();
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtxClass) return;
+    if (!window._hapticCtx) {
+      window._hapticCtx = new AudioCtxClass();
+    }
+    const ctx = window._hapticCtx;
+    if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+      ctx.resume().catch(() => {});
+    }
+    const now = ctx.currentTime;
 
-      if (type === 'success') {
-        // Moderner, glasklarer 2-Ton Erfolgs-Chime (C6 -> G6)
-        const osc1 = ctx.createOscillator();
-        const gain1 = ctx.createGain();
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(1046.5, now);
-        gain1.gain.setValueAtTime(0.035, now);
-        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
-        osc1.connect(gain1);
-        gain1.connect(ctx.destination);
-        osc1.start(now);
-        osc1.stop(now + 0.12);
+    if (type === 'success') {
+      // Moderner, glasklarer 2-Ton Erfolgs-Chime (C6 -> G6)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(1046.5, now);
+      gain1.gain.setValueAtTime(0.08, now);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.14);
 
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(1567.98, now + 0.055);
-        gain2.gain.setValueAtTime(0.0001, now);
-        gain2.gain.setValueAtTime(0.045, now + 0.055);
-        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
-        osc2.connect(gain2);
-        gain2.connect(ctx.destination);
-        osc2.start(now + 0.055);
-        osc2.stop(now + 0.22);
-      } else if (type === 'delete') {
-        // Moderner, knackiger Soft-Pop statt dumpfem Brummen
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(650, now);
-        osc.frequency.exponentialRampToValueAtTime(220, now + 0.045);
-        gain.gain.setValueAtTime(0.04, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.045);
-      } else {
-        // Moderner, dezenter Micro-Click (Glasklick / Taptic Feedback)
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1600, now);
-        osc.frequency.exponentialRampToValueAtTime(900, now + 0.016);
-        gain.gain.setValueAtTime(0.03, now);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.016);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.016);
-      }
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1567.98, now + 0.055);
+      gain2.gain.setValueAtTime(0.0001, now);
+      gain2.gain.setValueAtTime(0.1, now + 0.055);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.055);
+      osc2.stop(now + 0.24);
+    } else if (type === 'delete') {
+      // Moderner, knackiger Soft-Pop
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(650, now);
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.05);
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } else {
+      // Moderner, dezenter Micro-Click (Glasklick / Taptic Feedback)
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1600, now);
+      osc.frequency.exponentialRampToValueAtTime(900, now + 0.02);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.02);
     }
   } catch(e) {}
 };
@@ -872,6 +931,36 @@ function App() {
     setSuccessMessage(msg);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 1600);
+  };
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const checkForAppUpdate = async () => {
+    triggerHaptic('light');
+    setIsCheckingUpdate(true);
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update().catch(() => {});
+          if (reg.waiting) {
+            reg.waiting.postMessage('SKIP_WAITING');
+          }
+        }
+      }
+      await fetch(`./index.html?t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
+      triggerHaptic('success');
+      triggerSuccessToast('App ist aktuell!');
+      setTimeout(() => {
+        window.location.reload();
+      }, 700);
+    } catch (e) {
+      window.location.reload();
+    } finally {
+      setIsCheckingUpdate(false);
+    }
   };
   const [swipeId, setSwipeId] = useState(null);
   const aiFileRef = useRef();
@@ -2954,6 +3043,21 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
       reader.readAsText(file);
     }}/>
   </div>
+  <div className="pt-4 border-t border-white/5 space-y-2.5">
+    <div className="flex items-center justify-between px-1">
+      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.0 Live</span>
+    </div>
+    <button 
+      type="button" 
+      onClick=${checkForAppUpdate} 
+      disabled=${isCheckingUpdate}
+      className="w-full bg-brand-500/10 border border-brand-500/30 text-brand-400 py-3.5 rounded-2xl font-black text-xs uppercase tracking-wider hover:bg-brand-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg touch-manipulation"
+    >
+      ${isCheckingUpdate ? html`<${LoaderIcon} size=${16}/> Suche nach Updates...` : html`🔄 Jetzt auf Updates prüfen`}
+    </button>
+    <p className="text-[9px] text-slate-500 text-center px-1 leading-normal">Aktualisiert die App direkt von GitHub, ohne sie vom Homescreen löschen zu müssen.</p>
+  </div>
   </div></div>`}${isScanning && html`<div className="fixed inset-0 bg-slate-950 z-[300] flex flex-col items-center justify-center p-6 backdrop-blur-3xl animate-in zoom-in duration-300"><div className="w-full max-w-md glass-card rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl"><div className="flex justify-between items-center p-8 bg-slate-900/50"><h3 className="font-black text-xl text-white flex items-center gap-3"><${BarcodeIcon} size=${24} className="text-brand-400"/> Scan</h3><div className="flex items-center gap-2"><button onClick=${toggleTorch} className=${`p-3 rounded-full transition-all ${isTorchOn ? 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'bg-slate-800 text-slate-300'}`} title="Taschenlampe"><${FlashlightIcon} size=${18}/></button><button onClick=${stopBarcodeScan} className="p-2 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${XIcon} size=${20}/></button></div></div><div className="p-6"><div id="qr-reader" className="w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner"/><p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Handy etwas weiter weg halten für Fokus</p></div></div></div>`}
 
 ${showCalendarModal && (() => {
@@ -3108,11 +3212,38 @@ const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(html`<${App}/>`);
 
 if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+
+  const checkSwUpdate = () => {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg) {
+        reg.update().catch(() => {});
+        if (reg.waiting) {
+          reg.waiting.postMessage('SKIP_WAITING');
+        }
+      }
+    }).catch(() => {});
+  };
+
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=2').then(reg => {
-      reg.update().catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=3').then(reg => {
+      checkSwUpdate();
+      setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
   });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkSwUpdate();
+    }
+  });
+  window.addEventListener('pageshow', checkSwUpdate);
 }
     </script>
 </body>
