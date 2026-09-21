@@ -175,24 +175,27 @@ const resizeImage = file => {
   });
 };
 
-// --- AUDIO & HAPTIC SUBSYSTEM (iOS Standalone & PWA Unmute) ---
-
-const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+// --- AUDIO & HAPTIC SUBSYSTEM (Ambient sound effects without Dynamic Island) ---
 
 const initAudioSession = () => {
-  if (typeof navigator !== 'undefined' && 'audioSession' in navigator) {
-    try {
-      navigator.audioSession.type = 'playback';
-    } catch(e) {}
+  if (typeof navigator !== 'undefined') {
+    if ('audioSession' in navigator) {
+      try {
+        navigator.audioSession.type = 'ambient';
+      } catch(e) {}
+    }
+    if ('mediaSession' in navigator) {
+      try {
+        navigator.mediaSession.playbackState = 'none';
+        navigator.mediaSession.metadata = null;
+      } catch(e) {}
+    }
   }
 };
 
 const unlockAudio = () => {
   initAudioSession();
   try {
-    const silentEl = new Audio(SILENT_WAV);
-    silentEl.play().catch(() => {});
-
     const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
     if (AudioCtxClass) {
       if (!window._hapticCtx) {
