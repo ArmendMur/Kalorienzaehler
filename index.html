@@ -69,8 +69,17 @@
         .glass-card { background: rgba(21, 30, 45, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .spinner { animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #qr-reader { border: none !important; width: 100% !important; background: black !important; }
-        #qr-reader video { border-radius: 1.5rem; object-fit: cover !important; }
+        @keyframes focusReticle {
+            0% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.3; }
+            20% { transform: translate(-50%, -50%) scale(0.95); opacity: 1; }
+            40% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+            60% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+            85% { transform: translate(-50%, -50%) scale(1.0); opacity: 0.9; }
+            100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0; }
+        }
+        .animate-focus-reticle { animation: focusReticle 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        #qr-reader { border: none !important; width: 100% !important; height: 100% !important; background: black !important; }
+        #qr-reader video { border-radius: 1.5rem; object-fit: cover !important; width: 100% !important; height: 100% !important; }
         input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
@@ -193,21 +202,31 @@ const initAudioSession = () => {
   }
 };
 
+const getAudioContext = () => {
+  try {
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtxClass) return null;
+    if (!window._hapticCtx || window._hapticCtx.state === 'closed') {
+      window._hapticCtx = new AudioCtxClass();
+    }
+    return window._hapticCtx;
+  } catch (e) {
+    return null;
+  }
+};
+
 const unlockAudio = () => {
   initAudioSession();
   try {
-    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtxClass) {
-      if (!window._hapticCtx) {
-        window._hapticCtx = new AudioCtxClass();
+    const ctx = getAudioContext();
+    if (ctx) {
+      if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+        ctx.resume().catch(() => {});
       }
-      if (window._hapticCtx.state === 'suspended' || window._hapticCtx.state === 'interrupted') {
-        window._hapticCtx.resume().catch(() => {});
-      }
-      const buffer = window._hapticCtx.createBuffer(1, 1, 22050);
-      const source = window._hapticCtx.createBufferSource();
+      const buffer = ctx.createBuffer(1, 1, 22050);
+      const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(window._hapticCtx.destination);
+      source.connect(ctx.destination);
       source.start(0);
     }
   } catch(e) {}
@@ -229,8 +248,9 @@ if (typeof window !== 'undefined') {
 
   const handleForegroundResume = () => {
     initAudioSession();
-    if (window._hapticCtx && (window._hapticCtx.state === 'suspended' || window._hapticCtx.state === 'interrupted')) {
-      window._hapticCtx.resume().catch(() => {});
+    const ctx = getAudioContext();
+    if (ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) {
+      ctx.resume().catch(() => {});
     }
   };
   document.addEventListener('visibilitychange', () => {
@@ -241,73 +261,79 @@ if (typeof window !== 'undefined') {
 
 const triggerHaptic = (type = 'light') => {
   if (typeof navigator !== 'undefined' && navigator.vibrate) {
-    if (type === 'success') navigator.vibrate([25, 40, 25]);
-    else if (type === 'delete') navigator.vibrate(30);
-    else navigator.vibrate(15);
+    try {
+      if (type === 'success') navigator.vibrate([25, 40, 25]);
+      else if (type === 'delete') navigator.vibrate(35);
+      else navigator.vibrate(12);
+    } catch(e) {}
   }
   try {
     initAudioSession();
-    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtxClass) return;
-    if (!window._hapticCtx) {
-      window._hapticCtx = new AudioCtxClass();
-    }
-    const ctx = window._hapticCtx;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const playSound = () => {
+      try {
+        const now = ctx.currentTime;
+        if (type === 'success') {
+          // Moderner, glasklarer 2-Ton Erfolgs-Chime (C6 -> G6)
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(1046.5, now);
+          gain1.gain.setValueAtTime(0.18, now);
+          gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.16);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(1567.98, now + 0.06);
+          gain2.gain.setValueAtTime(0.0001, now);
+          gain2.gain.setValueAtTime(0.2, now + 0.06);
+          gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(now + 0.06);
+          osc2.stop(now + 0.28);
+        } else if (type === 'delete') {
+          // Moderner, knackiger Soft-Pop
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(580, now);
+          osc.frequency.exponentialRampToValueAtTime(180, now + 0.06);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.06);
+        } else {
+          // Moderner, angenehmer Micro-Click (Glasklick / Taptic Feedback)
+          // Zuverlässig & knackig hörbar auf Chrome, Safari, Android & Desktop
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(1400, now);
+          osc.frequency.exponentialRampToValueAtTime(450, now + 0.038);
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.038);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.038);
+        }
+      } catch(e) {}
+    };
+
     if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
-      ctx.resume().catch(() => {});
-    }
-    const now = ctx.currentTime;
-
-    if (type === 'success') {
-      // Moderner, glasklarer 2-Ton Erfolgs-Chime (C6 -> G6)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(1046.5, now);
-      gain1.gain.setValueAtTime(0.08, now);
-      gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.14);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.14);
-
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1567.98, now + 0.055);
-      gain2.gain.setValueAtTime(0.0001, now);
-      gain2.gain.setValueAtTime(0.1, now + 0.055);
-      gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.055);
-      osc2.stop(now + 0.24);
-    } else if (type === 'delete') {
-      // Moderner, knackiger Soft-Pop
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(650, now);
-      osc.frequency.exponentialRampToValueAtTime(220, now + 0.05);
-      gain.gain.setValueAtTime(0.09, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.05);
+      ctx.resume().then(playSound).catch(() => {});
     } else {
-      // Moderner, dezenter Micro-Click (Glasklick / Taptic Feedback)
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1600, now);
-      osc.frequency.exponentialRampToValueAtTime(900, now + 0.02);
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.02);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.02);
+      playSound();
     }
   } catch(e) {}
 };
@@ -851,6 +877,8 @@ function App() {
   });
 
   const [isTorchOn, setIsTorchOn] = useState(false);
+  const [focusPoint, setFocusPoint] = useState(null);
+  const focusTimeoutRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('kTrackUser', JSON.stringify(user));
@@ -1003,6 +1031,66 @@ function App() {
     }
   };
 
+  const handleCameraTap = async (e) => {
+    if (!isScanning) return;
+    const readerWrapper = e.currentTarget;
+    if (!readerWrapper) return;
+
+    const rect = readerWrapper.getBoundingClientRect();
+    const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : rect.left + rect.width / 2);
+    const clientY = e.clientY ?? (e.touches && e.touches[0] ? e.touches[0].clientY : rect.top + rect.height / 2);
+
+    const x = Math.max(20, Math.min(rect.width - 20, clientX - rect.left));
+    const y = Math.max(20, Math.min(rect.height - 20, clientY - rect.top));
+
+    setFocusPoint({ x, y, id: Date.now() });
+    triggerHaptic('light');
+
+    try {
+      const videoElement = document.querySelector('#qr-reader video');
+      if (videoElement && videoElement.srcObject) {
+        const track = videoElement.srcObject.getVideoTracks()[0];
+        if (track && typeof track.applyConstraints === 'function') {
+          const normX = Math.max(0, Math.min(1, x / rect.width));
+          const normY = Math.max(0, Math.min(1, y / rect.height));
+          const capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
+
+          if (capabilities.pointsOfInterest) {
+            try {
+              await track.applyConstraints({
+                advanced: [{
+                  focusMode: 'continuous',
+                  pointsOfInterest: [{ x: normX, y: normY }]
+                }]
+              });
+              return;
+            } catch(poiErr) {}
+          }
+
+          if (capabilities.focusMode) {
+            try {
+              await track.applyConstraints({
+                advanced: [{ focusMode: 'continuous' }]
+              });
+              return;
+            } catch(fmErr) {}
+          }
+
+          try {
+            await track.applyConstraints({
+              advanced: [{ focusMode: 'continuous' }]
+            });
+          } catch(fallbackErr) {}
+        }
+      }
+    } catch(err) {}
+
+    if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+    focusTimeoutRef.current = setTimeout(() => {
+      setFocusPoint(null);
+    }, 1200);
+  };
+
   const openNewRecipeModal = () => {
     triggerHaptic('light');
     setRecipeDraft({
@@ -1142,12 +1230,17 @@ function App() {
 
   // Kamera sicher ausschalten, wenn die Komponente entladen wird oder isScanning false ist
   useEffect(() => {
-    if (!isScanning && qrInstance.current) {
-      try {
-        qrInstance.current.stop().then(() => qrInstance.current.clear()).catch(()=>{});
-      } catch(e) {}
+    if (!isScanning) {
+      setFocusPoint(null);
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
+      if (qrInstance.current) {
+        try {
+          qrInstance.current.stop().then(() => qrInstance.current.clear()).catch(()=>{});
+        } catch(e) {}
+      }
     }
     return () => {
+      if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
       if (qrInstance.current) {
         try { qrInstance.current.stop().catch(()=>{}); } catch(e){}
       }
@@ -1583,31 +1676,20 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
   };
   const startBarcodeScan = () => {
     triggerHaptic('light');
+    setFocusPoint(null);
     setIsScanning(true);
     setTimeout(() => {
       const config = {
-        fps: 10,
+        fps: 12,
         qrbox: {
-          width: 250,
-          height: 250
+          width: 260,
+          height: 260
         }
       };
 
-      // Wir versuchen nacheinander die beste Konfiguration (Autofokus -> HD -> Standard)
-      // Dies verhindert den schwarzen Bildschirm, falls ein Handy Autofokus nicht unterstützt.
+      // Standard-kompatible Kamera-Profile (vermeidet OverconstrainedError & mehrfache Berechtigungsanfragen)
       const attempts = [{
-        facingMode: "environment",
-        width: {
-          ideal: 1920
-        },
-        height: {
-          ideal: 1080
-        },
-        advanced: [{
-          focusMode: "continuous"
-        }]
-      }, {
-        facingMode: "environment",
+        facingMode: { ideal: "environment" },
         width: {
           ideal: 1920
         },
@@ -1620,7 +1702,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       let currentAttempt = 0;
       const tryNext = () => {
         if (currentAttempt >= attempts.length) {
-          alert("Kamera-Fehler. Bitte Berechtigungen prüfen.");
+          alert("Kamera-Fehler. Bitte Berechtigungen in den Browser-Einstellungen prüfen.");
           setIsScanning(false);
           return;
         }
@@ -1633,27 +1715,47 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         qrInstance.current.start(attempts[currentAttempt], config, text => {
           fetchBarcode(text);
           stopBarcodeScan();
-        }, () => {}).catch(err => {
+        }, () => {}).then(() => {
+          // Stream erfolgreich aktiv -> Autofokus direkt auf dem laufenden Videotrack anfordern
+          try {
+            const videoElement = document.querySelector('#qr-reader video');
+            if (videoElement && videoElement.srcObject) {
+              const track = videoElement.srcObject.getVideoTracks()[0];
+              if (track && typeof track.applyConstraints === 'function') {
+                track.applyConstraints({
+                  advanced: [{ focusMode: "continuous" }]
+                }).catch(() => {});
+              }
+            }
+          } catch(e) {}
+        }).catch(err => {
           console.warn(`Kamera-Versuch ${currentAttempt + 1} fehlgeschlagen, versuche Alternative...`, err);
           currentAttempt++;
           tryNext();
         });
       };
       tryNext();
-    }, 300);
+    }, 250);
   };
   const stopBarcodeScan = () => {
     triggerHaptic('light');
+    setFocusPoint(null);
+    if (focusTimeoutRef.current) clearTimeout(focusTimeoutRef.current);
     if (qrInstance.current) {
       qrInstance.current.stop().then(() => {
         qrInstance.current.clear();
         setIsScanning(false);
+        setIsTorchOn(false);
       }).catch(() => {
         try {
           qrInstance.current.clear();
         } catch (e) {}
         setIsScanning(false);
+        setIsTorchOn(false);
       });
+    } else {
+      setIsScanning(false);
+      setIsTorchOn(false);
     }
   };
   const fetchEmojiForProduct = async name => {
@@ -3061,7 +3163,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
     </button>
     <p className="text-[9px] text-slate-500 text-center px-1 leading-normal">Aktualisiert die App direkt von GitHub, ohne sie vom Homescreen löschen zu müssen.</p>
   </div>
-  </div></div>`}${isScanning && html`<div className="fixed inset-0 bg-slate-950 z-[300] flex flex-col items-center justify-center p-6 backdrop-blur-3xl animate-in zoom-in duration-300"><div className="w-full max-w-md glass-card rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl"><div className="flex justify-between items-center p-8 bg-slate-900/50"><h3 className="font-black text-xl text-white flex items-center gap-3"><${BarcodeIcon} size=${24} className="text-brand-400"/> Scan</h3><div className="flex items-center gap-2"><button onClick=${toggleTorch} className=${`p-3 rounded-full transition-all ${isTorchOn ? 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'bg-slate-800 text-slate-300'}`} title="Taschenlampe"><${FlashlightIcon} size=${18}/></button><button onClick=${stopBarcodeScan} className="p-2 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${XIcon} size=${20}/></button></div></div><div className="p-6"><div id="qr-reader" className="w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner"/><p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Handy etwas weiter weg halten für Fokus</p></div></div></div>`}
+  </div></div>`}${isScanning && html`<div className="fixed inset-0 bg-slate-950 z-[300] flex flex-col items-center justify-center p-6 backdrop-blur-3xl animate-in zoom-in duration-300"><div className="w-full max-w-md glass-card rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl"><div className="flex justify-between items-center p-8 bg-slate-900/50"><h3 className="font-black text-xl text-white flex items-center gap-3"><${BarcodeIcon} size=${24} className="text-brand-400"/> Scan</h3><div className="flex items-center gap-2"><button onClick=${toggleTorch} className=${`p-3 rounded-full transition-all ${isTorchOn ? 'bg-amber-400 text-slate-950 shadow-[0_0_15px_rgba(251,191,36,0.6)]' : 'bg-slate-800 text-slate-300'}`} title="Taschenlampe"><${FlashlightIcon} size=${18}/></button><button onClick=${stopBarcodeScan} className="p-2 bg-slate-800 rounded-full active:scale-90 transition-all text-white"><${XIcon} size=${20}/></button></div></div><div className="p-6"><div className="relative w-full aspect-square rounded-3xl overflow-hidden border-4 border-slate-900 shadow-inner cursor-pointer select-none touch-manipulation" onClick=${handleCameraTap}><div id="qr-reader" className="w-full h-full"/>${focusPoint && html`<div key=${focusPoint.id} className="absolute pointer-events-none z-30 animate-focus-reticle" style=${{ left: `${focusPoint.x}px`, top: `${focusPoint.y}px` }}><div className="w-16 h-16 border-2 border-brand-400 rounded-2xl flex items-center justify-center shadow-[0_0_15px_rgba(168,85,247,0.7)] relative"><div className="w-2 h-2 rounded-full bg-brand-400 shadow-[0_0_8px_rgba(168,85,247,1)]"></div></div></div>`}</div><p className="text-center text-[10px] font-black text-slate-500 uppercase tracking-widest mt-4">Tippe auf das Bild zum Fokussieren</p></div></div></div>`}
 
 ${showCalendarModal && (() => {
   const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
