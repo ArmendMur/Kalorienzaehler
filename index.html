@@ -141,6 +141,12 @@ const getSmartFoodUnit = (food) => {
   }
   const name = (food.name || '').toLowerCase();
   
+  if (/\b(whey|proteinpulver|protein powder|casein|clear whey|iso whey|protein shake)\b/i.test(name) || /whey/i.test(name) || /proteinpulver/i.test(name)) {
+    const weight = (food.pieceWeight && Number(food.pieceWeight) > 0)
+      ? Number(food.pieceWeight)
+      : (food.amount && food.amount > 0 && food.amount < 100 ? Number(food.amount) : 30);
+    return { unitName: 'Scoop', pieceWeight: weight };
+  }
   if (/\b(ei|eier|rührei|spiegelei|gekochtes ei|gekochte eier)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 55 };
   if (/\b(nugget|nuggets)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 20 };
   if (/\b(banane|bananen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
@@ -1790,22 +1796,11 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       const data = await res.json();
       if (data.status === 1) {
         const p = data.product;
-        const emoji = await fetchEmojiForProduct(p.product_name || "Unbekannt");
+        const pName = p.product_name || "Unbekannt";
+        const emoji = await fetchEmojiForProduct(pName);
         const rawFat = Math.round((Number(p.nutriments.fat_100g) || 0) * 10) / 10;
         const rawSatFat = Math.round((Number(p.nutriments['saturated-fat_100g']) || 0) * 10) / 10;
         const rawUnsatFat = Math.max(0, Math.round((rawFat - rawSatFat) * 10) / 10);
-        const item = {
-          name: p.product_name || "Unbekannt",
-          calories: Math.round(Number(p.nutriments['energy-kcal_100g']) || 0),
-          protein: Math.round((Number(p.nutriments.proteins_100g) || 0) * 10) / 10,
-          carbs: Math.round((Number(p.nutriments.carbohydrates_100g) || 0) * 10) / 10,
-          sugar: Math.round((Number(p.nutriments.sugars_100g) || 0) * 10) / 10,
-          fat: rawFat,
-          saturatedFat: rawSatFat,
-          unsaturatedFat: rawUnsatFat,
-          emoji: emoji,
-          isBarcode: true
-        };
         let parsedPortion = 100;
         if (p.serving_quantity) {
           const q = parseFloat(String(p.serving_quantity).replace(',', '.'));
@@ -1817,6 +1812,36 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             if (!isNaN(q) && q > 0) parsedPortion = q;
           }
         }
+
+        const isWhey = /\b(whey|proteinpulver|protein powder|casein|clear whey|iso whey|protein shake)\b/i.test(pName) ||
+                       /whey/i.test(pName) ||
+                       /proteinpulver/i.test(pName) ||
+                       (p.serving_size && /scoop|messlöffel|messloeffel/i.test(p.serving_size));
+
+        let detectedUnitName = null;
+        let detectedPieceWeight = null;
+        if (isWhey) {
+          detectedUnitName = 'Scoop';
+          if (parsedPortion === 100 || !parsedPortion) {
+            parsedPortion = 30;
+          }
+          detectedPieceWeight = Math.round(parsedPortion);
+        }
+
+        const item = {
+          name: pName,
+          calories: Math.round(Number(p.nutriments['energy-kcal_100g']) || 0),
+          protein: Math.round((Number(p.nutriments.proteins_100g) || 0) * 10) / 10,
+          carbs: Math.round((Number(p.nutriments.carbohydrates_100g) || 0) * 10) / 10,
+          sugar: Math.round((Number(p.nutriments.sugars_100g) || 0) * 10) / 10,
+          fat: rawFat,
+          saturatedFat: rawSatFat,
+          unsaturatedFat: rawUnsatFat,
+          emoji: (emoji === '🍽️' && isWhey) ? '🥤' : emoji,
+          isBarcode: true,
+          unitName: detectedUnitName,
+          pieceWeight: detectedPieceWeight
+        };
         setSelectedFood(item);
         setAmount(Math.round(parsedPortion));
       } else {
@@ -1836,7 +1861,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                     WICHTIGSTE REGEL: Gib IMMER und AUSNAHMSLOS die Nährwerte für exakt 100 Gramm an!
                     Schätze bei 'estimatedPortionWeight' das ungefähre Gesamtgewicht der gesamten Mahlzeit/Portion in Gramm (z.B. 350 für einen Teller Nudeln, 140 für 7 Nuggets).
                     SMARTE EINHEIT:
-                    - Wenn es sich um echt zählbare Stückgüter handelt (z.B. Eier, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Burger, Dosen, Würstchen), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 20 für 1 Nugget, 55 für 1 Ei, 30 für 1 Scheibe Toast) an.
+                    - Wenn es sich um echt zählbare Stückgüter handelt (z.B. Eier, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Burger, Dosen, Würstchen oder Proteinpulver/Whey mit 'Scoop' ca. 30g), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 20 für 1 Nugget, 55 für 1 Ei, 30 für 1 Scoop) an.
                     - Bei Schüttgut, Tellern, Schüsseln, gemischten Mahlzeiten (z.B. Pasta, Reis mit Beilage, Bowls, Curry, Salat, Müsli, Steak, Auflauf) setze 'unitName': null und 'pieceWeight': null. Verwende NIEMALS "Portion", "Teller", "Schale" oder "Mahlzeit" als unitName!
                     Wähle GENAU EIN passendes Emoji aus.
                     Gib AUSSCHLIESSLICH ein einziges, valides JSON-Objekt zurück.
@@ -1921,14 +1946,15 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     const rawF = Number(food.baseFat ?? food.fat ?? 0);
     const rawSF = Number(food.baseSaturatedFat ?? food.saturatedFat ?? 0);
     const rawUF = food.baseUnsaturatedFat !== undefined ? Number(food.baseUnsaturatedFat) : (food.unsaturatedFat !== undefined ? Number(food.unsaturatedFat) : Math.max(0, rawF - rawSF));
+    const uInfo = getSmartFoodUnit(food);
     setSelectedFood({
       name: food.name,
       emoji: food.emoji,
       image: food.image,
       isBarcode: food.isBarcode,
       isAi: food.isAi,
-      unitName: food.unitName,
-      pieceWeight: food.pieceWeight,
+      unitName: uInfo?.unitName ?? food.unitName,
+      pieceWeight: uInfo?.pieceWeight ?? food.pieceWeight,
       calories: Math.round(Number(food.baseCalories ?? food.calories ?? 0)),
       protein: Math.round((Number(food.baseProtein ?? food.protein ?? 0)) * 10) / 10,
       carbs: Math.round((Number(food.baseCarbs ?? food.carbs ?? 0)) * 10) / 10,
@@ -1937,7 +1963,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       saturatedFat: Math.round(rawSF * 10) / 10,
       unsaturatedFat: Math.round(rawUF * 10) / 10
     });
-    setAmount(food.lastAmount || 100);
+    setAmount(food.lastAmount || (uInfo ? uInfo.pieceWeight : 100));
   };
   const openEdit = item => {
     triggerHaptic('light');
@@ -1985,13 +2011,18 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     const pieceCount = rawPieceCount ? Math.round(rawPieceCount * 10) / 10 : null;
     const countDisplay = pieceCount ? (Number.isInteger(pieceCount) ? pieceCount : pieceCount.toString().replace('.', ',')) : null;
 
+    let unitLabel = unitInfo?.unitName || '';
+    if (unitLabel.toLowerCase() === 'scoop' && pieceCount > 1) {
+      unitLabel = 'Scoops';
+    }
+
     const entry = {
       name: baseProps.name,
       instanceId: editingInstanceId || generateId(),
       amount: safeAmount,
       amountFactor: factor,
       amountDisplay: unitInfo && entryUnitMode === 'unit' && countDisplay
-        ? `${countDisplay} ${unitInfo.unitName} (${safeAmount}g)`
+        ? `${countDisplay} ${unitLabel} (${safeAmount}g)`
         : `${safeAmount}g`,
       unitName: unitInfo?.unitName || null,
       pieceWeight: unitInfo?.pieceWeight || null,
@@ -2227,7 +2258,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                     }}
                     className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-24"
                   />
-                  <span className="text-base sm:text-lg font-black text-white pointer-events-none">${unitInfo.unitName}</span>
+                  <span className="text-base sm:text-lg font-black text-white pointer-events-none">${(roundedCount > 1 && unitInfo.unitName.toLowerCase() === 'scoop') ? 'Scoops' : unitInfo.unitName}</span>
                 </div>
                 <div className="text-xs font-bold text-brand-400 mt-0.5">
                   ≈ ${Number.isInteger(amount) ? amount : Number(amount).toFixed(1).replace(/\.0$/, '').replace('.', ',')} g
@@ -2271,7 +2302,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 </div>
                 ${unitInfo ? html`
                   <div className="text-xs font-bold text-brand-400 mt-0.5">
-                    ≈ ${displayCount} ${unitInfo.unitName}
+                    ≈ ${displayCount} ${(roundedCount > 1 && unitInfo.unitName.toLowerCase() === 'scoop') ? 'Scoops' : unitInfo.unitName}
                   </div>
                 ` : ''}
               </div>
@@ -3151,7 +3182,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.1 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.2 Live</span>
     </div>
     <button 
       type="button" 
@@ -3337,7 +3368,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.1').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=3.2').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
