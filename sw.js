@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kalorien-zaehler-v3.2';
+const CACHE_NAME = 'kalorien-zaehler-v3.3';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -16,7 +16,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Jedes Asset einzeln laden und cachen (Promise.allSettled verhindert, dass ein fehlerhafter CDN-Aufruf die gesamte Installation abbricht)
+      // Jedes Asset einzeln laden und cachen (Promise.allSettled verhindert Abbruch)
       await Promise.allSettled(
         STATIC_ASSETS.map(async (url) => {
           try {
@@ -91,10 +91,16 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(event.request.url);
-  const isHtmlNavigation = event.request.mode === 'navigate' ||
-    (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) ||
-    url.pathname.endsWith('/') ||
-    url.pathname.endsWith('/index.html');
+  const isSameOrigin = url.origin === self.location.origin;
+
+  // Nur ECHTE HTML-Dokumentennavigation der eigenen App als HTML-Navigation behandeln!
+  // Externe Skripte (wie cdn.tailwindcss.com) dürfen NIEMALS als HTML abgefangen werden!
+  const isHtmlNavigation = isSameOrigin && (
+    event.request.mode === 'navigate' ||
+    event.request.destination === 'document' ||
+    url.pathname.endsWith('/index.html') ||
+    (url.pathname.endsWith('/') && !url.pathname.includes('.'))
+  );
 
   if (isHtmlNavigation) {
     // Netzwerk Prio 1 mit schnellem 2.2s-Fallback auf Cache bei Offline / schlechtem Empfang
@@ -153,7 +159,7 @@ self.addEventListener('fetch', (event) => {
 
   // Cache-First für statische Assets (Scripts, Stylesheets, Icons, Fonts)
   event.respondWith((async () => {
-    const cachedResponse = await caches.match(event.request, { ignoreSearch: true });
+    const cachedResponse = await caches.match(event.request);
     if (cachedResponse) {
       if (typeof navigator === 'undefined' || navigator.onLine !== false) {
         fetch(event.request).then(async (networkResponse) => {
@@ -175,7 +181,7 @@ self.addEventListener('fetch', (event) => {
       }
       return networkResponse;
     } catch (err) {
-      const fallback = await caches.match(event.request, { ignoreSearch: true });
+      const fallback = await caches.match(event.request);
       if (fallback) return fallback;
       throw err;
     }
