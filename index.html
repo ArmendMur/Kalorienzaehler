@@ -605,28 +605,43 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
   `;
 };
 
-const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => html`
+const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => {
+  const timeStr = item.timeStr || (item.timestamp ? new Date(item.timestamp).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : null);
+  return html`
   <${SwipeableItem} onSelect=${() => item.isActivity ? (onSelectActivity && onSelectActivity(item)) : (onSelect && onSelect(item))} onDelete=${() => onDelete(item.instanceId)}>
-    <div className=${`glass-card p-4 rounded-[1.8rem] flex justify-between items-center relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 ${item.isActivity ? 'bg-slate-900/95 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-900/90'}`}>
-      <div className="flex items-center gap-4 min-w-0 flex-1">
+    <div className=${`glass-card px-4 py-3.5 rounded-[1.8rem] flex justify-between items-center gap-3 relative z-10 cursor-pointer active:scale-[0.99] transition-transform duration-150 ${item.isActivity ? 'bg-slate-900/95 border border-amber-500/40 shadow-[0_0_15px_rgba(245,158,11,0.15)]' : 'bg-slate-900/90'}`}>
+      <div className="flex items-center gap-3.5 min-w-0 flex-1">
         <div className=${`shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl flex items-center justify-center text-xl shadow-inner border ${item.isActivity ? 'bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.1)]' : 'bg-slate-800/50 border-white/5'}`}>
           ${getItemDisplay(item)}
         </div>
         <div className="flex-1 min-w-0 py-0.5">
           <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-          <div className=${`text-[10px] font-black uppercase truncate ${item.isActivity ? 'text-amber-400' : 'text-slate-500'}`}>
+          <div className=${`text-[10px] font-black uppercase truncate mt-0.5 ${item.isActivity ? 'text-amber-400/90' : 'text-slate-400'}`}>
             ${item.isActivity 
-              ? `${item.durationMinutes ? `${item.durationMinutes} Min | ` : ''}⚡ -${item.burnedCalories || item.calories || 0} kcal verbrannt`
-              : `${formatFoodAmountDisplay(item)} | ${Math.round(item.calories)} kcal`}
+              ? `${timeStr ? `${timeStr} · ` : ''}${item.durationMinutes ? `${item.durationMinutes} Min Training` : 'Aktivität'}`
+              : `${timeStr ? `${timeStr} · ` : ''}${formatFoodAmountDisplay(item)}`}
           </div>
         </div>
       </div>
-      <div className="shrink-0 text-slate-600 pl-2">
-        <${ArrowLeftIcon} size=${14} className="opacity-40" />
+      <div className="shrink-0 text-right pl-2 flex flex-col items-end justify-center">
+        ${item.isActivity ? html`
+          <div className="text-sm font-black text-amber-400 whitespace-nowrap">-${Math.round(item.burnedCalories || item.calories || 0)} <span className="text-[10px] font-bold">kcal</span></div>
+          <div className="text-[9px] font-black uppercase text-amber-500/80 tracking-wider mt-0.5">⚡ Verbrannt</div>
+        ` : html`
+          <div className="text-sm font-black text-white whitespace-nowrap">${Math.round(item.calories)} <span className="text-[10px] font-bold text-brand-400">kcal</span></div>
+          <div className="flex items-center gap-1 text-[9px] font-black mt-0.5 whitespace-nowrap">
+            <span className="text-fuchsia-400">${Math.round(item.protein || 0)}P</span>
+            <span className="text-slate-600">·</span>
+            <span className="text-blue-400">${Math.round(item.carbs || 0)}C</span>
+            <span className="text-slate-600">·</span>
+            <span className="text-amber-400">${Math.round(item.fat || 0)}F</span>
+          </div>
+        `}
       </div>
     </div>
   </${SwipeableItem}>
 `;
+};
 
 const AnimatedNumber = ({ value }) => {
   const [display, setDisplay] = useState(value);
@@ -913,7 +928,36 @@ function App() {
     return {};
   });
   const [selectedDate, setSelectedDate] = useState(() => getLocalToday());
+  const lastKnownTodayRef = useRef(getLocalToday());
   const dailyLog = allLogs[selectedDate] || { date: selectedDate, items: [] };
+
+  // Automatischer Tageswechsel um Mitternacht (auch wenn Homescreen-App im Hintergrund offen blieb)
+  useEffect(() => {
+    const syncDayRollover = () => {
+      const currentToday = getLocalToday();
+      if (currentToday !== lastKnownTodayRef.current) {
+        const prevToday = lastKnownTodayRef.current;
+        lastKnownTodayRef.current = currentToday;
+        setSelectedDate(prevSelected => (prevSelected === prevToday ? currentToday : prevSelected));
+        const now = new Date();
+        setCalendarMonth(now.getMonth());
+        setCalendarYear(now.getFullYear());
+      }
+    };
+    const onVis = () => {
+      if (document.visibilityState === 'visible') syncDayRollover();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pageshow', syncDayRollover);
+    window.addEventListener('focus', syncDayRollover);
+    const interval = setInterval(syncDayRollover, 30000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pageshow', syncDayRollover);
+      window.removeEventListener('focus', syncDayRollover);
+      clearInterval(interval);
+    };
+  }, []);
 
   const setDailyLog = useCallback((updater) => {
     setAllLogs(prevLogs => {
@@ -1079,6 +1123,74 @@ function App() {
   const [showAiModal, setShowAiModal] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('Gespeichert!');
+  const [emojiPickerConfig, setEmojiPickerConfig] = useState(null);
+  const [customEmojiInput, setCustomEmojiInput] = useState('');
+  const [isAddingIngredient, setIsAddingIngredient] = useState(false);
+  const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Prüfe auf GitHub-Update...' });
+  const lastUpdateCheckRef = useRef(0);
+
+  const runVisualUpdateCheck = useCallback(async (forceManual = false) => {
+    const now = Date.now();
+    if (!forceManual && now - lastUpdateCheckRef.current < 5 * 60 * 1000) return;
+    lastUpdateCheckRef.current = now;
+
+    setUpdateBanner({ visible: true, progress: 18, text: 'Prüfe auf GitHub-Update...' });
+    const t1 = setTimeout(() => setUpdateBanner(p => p.visible ? { ...p, progress: 55 } : p), 220);
+    const t2 = setTimeout(() => setUpdateBanner(p => p.visible ? { ...p, progress: 82 } : p), 500);
+
+    let foundNew = false;
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        if (reg) {
+          await reg.update().catch(() => {});
+          if (reg.waiting) {
+            foundNew = true;
+            setUpdateBanner({ visible: true, progress: 100, text: 'Neues Update wird installiert...' });
+            reg.waiting.postMessage('SKIP_WAITING');
+            return;
+          }
+          if (reg.installing) {
+            foundNew = true;
+            setUpdateBanner({ visible: true, progress: 92, text: 'Lade neues Update von GitHub...' });
+            const sw = reg.installing;
+            sw.addEventListener('statechange', () => {
+              if (sw.state === 'installed' && reg.waiting) {
+                setUpdateBanner({ visible: true, progress: 100, text: 'Update bereit – starte neu...' });
+                reg.waiting.postMessage('SKIP_WAITING');
+              } else if (sw.state === 'activated' || sw.state === 'redundant') {
+                setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.5 ist aktuell ✓' });
+                setTimeout(() => setUpdateBanner(p => ({ ...p, visible: false })), 600);
+              }
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {}
+
+    setTimeout(() => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (!foundNew) {
+        setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.5 ist aktuell ✓' });
+        setTimeout(() => {
+          setUpdateBanner(p => ({ ...p, visible: false }));
+        }, 650);
+      }
+    }, 800);
+  }, []);
+
+  useEffect(() => {
+    runVisualUpdateCheck(false);
+    const onVisUpdate = () => {
+      if (document.visibilityState === 'visible') {
+        runVisualUpdateCheck(false);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisUpdate);
+    return () => document.removeEventListener('visibilitychange', onVisUpdate);
+  }, [runVisualUpdateCheck]);
 
   useEffect(() => {
     if (selectedFood) {
@@ -1103,11 +1215,13 @@ function App() {
   const checkForAppUpdate = async () => {
     triggerHaptic('light');
     setIsCheckingUpdate(true);
+    setUpdateBanner({ visible: true, progress: 25, text: 'Lade neueste Version von GitHub...' });
     try {
       if ('caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map(k => caches.delete(k)));
       }
+      setUpdateBanner({ visible: true, progress: 65, text: 'Aktualisiere App-Cache...' });
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
@@ -1118,6 +1232,7 @@ function App() {
         }
       }
       await fetch(`./index.html?t=${Date.now()}`, { cache: 'no-store' }).catch(() => {});
+      setUpdateBanner({ visible: true, progress: 100, text: 'App ist aktuell ✓' });
       triggerHaptic('success');
       triggerSuccessToast('App ist aktuell!');
       setTimeout(() => {
@@ -1258,30 +1373,74 @@ function App() {
     setShowRecipeModal(true);
   };
 
-  const addIngredientToDraft = (customFood = null) => {
+  const addIngredientToDraft = async (customFood = null) => {
     const isExplicitFood = customFood && typeof customFood === 'object' && !customFood.nativeEvent && !customFood._reactName;
     let targetFood = isExplicitFood ? customFood : draftSelectedFood;
 
+    const g = Number(draftIngGrams) || 0;
+    if (g <= 0) return alert("Bitte eine gültige Grammzahl eingeben.");
+
     if (!targetFood && draftIngSearch.trim()) {
-      const q = draftIngSearch.trim().toLowerCase();
+      const rawName = draftIngSearch.trim();
+      const q = rawName.toLowerCase();
       const matched = allSavedFoods.find(f => f?.name?.toLowerCase() === q) ||
                       allSavedFoods.find(f => f?.name?.toLowerCase().includes(q));
-      targetFood = matched || {
-        name: draftIngSearch.trim(),
-        emoji: '🍽️',
-        calories: 100,
-        protein: 0,
-        carbs: 0,
-        sugar: 0,
-        fat: 0,
-        saturatedFat: 0,
-        unsaturatedFat: 0
-      };
+      if (matched) {
+        targetFood = matched;
+      } else if (user.geminiApiKey) {
+        setIsAddingIngredient(true);
+        try {
+          const prompt = `Gib die Nährwerte pro 100g für die Zutat "${rawName}" sowie ein einzelnes passendes Emoji als JSON zurück: {"name":"${rawName}","emoji":"🍽️","calories":int,"protein":float,"carbs":float,"sugar":float,"fat":float,"saturatedFat":float}`;
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { response_mime_type: "application/json" }
+            })
+          });
+          const data = await res.json();
+          const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          const match = txt.match(/\{[\s\S]*\}/);
+          if (match) {
+            const parsed = JSON.parse(match[0]);
+            const fVal = Number(parsed.fat) || 0;
+            const sfVal = Number(parsed.saturatedFat) || 0;
+            targetFood = {
+              name: parsed.name || rawName,
+              emoji: parsed.emoji ? [...String(parsed.emoji).trim()][0] : '🍽️',
+              calories: Number(parsed.calories) || 100,
+              protein: Number(parsed.protein) || 0,
+              carbs: Number(parsed.carbs) || 0,
+              sugar: Number(parsed.sugar) || 0,
+              fat: fVal,
+              saturatedFat: sfVal,
+              unsaturatedFat: Math.max(0, Math.round((fVal - sfVal) * 10) / 10)
+            };
+          }
+        } catch (e) {
+          console.warn("KI-Zutat Fallback:", e);
+        } finally {
+          setIsAddingIngredient(false);
+        }
+      }
+
+      if (!targetFood) {
+        targetFood = {
+          name: rawName,
+          emoji: '🍽️',
+          calories: 100,
+          protein: 0,
+          carbs: 0,
+          sugar: 0,
+          fat: 0,
+          saturatedFat: 0,
+          unsaturatedFat: 0
+        };
+      }
     }
 
     if (!targetFood) return alert("Bitte wähle eine Zutat aus.");
-    const g = Number(draftIngGrams) || 0;
-    if (g <= 0) return alert("Bitte eine gültige Grammzahl eingeben.");
     const ing = {
       id: generateId(),
       name: targetFood.name,
@@ -1375,14 +1534,14 @@ function App() {
   };
 
   useEffect(() => {
-    const isModalOpen = !!(selectedFood || showAiModal || showDetails || isScanning || showRecipeModal || showActivityModal || showCalendarModal || showAiCoach);
+    const isModalOpen = !!(selectedFood || showAiModal || showDetails || isScanning || showRecipeModal || showActivityModal || showCalendarModal || showAiCoach || emojiPickerConfig);
     document.body.style.overflow = isModalOpen ? 'hidden' : '';
     document.body.style.touchAction = isModalOpen ? 'none' : '';
     return () => {
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
     };
-  }, [selectedFood, showAiModal, showDetails, isScanning, showRecipeModal, showActivityModal, showCalendarModal, showAiCoach]);
+  }, [selectedFood, showAiModal, showDetails, isScanning, showRecipeModal, showActivityModal, showCalendarModal, showAiCoach, emojiPickerConfig]);
 
   // Kamera sicher ausschalten, wenn die Komponente entladen wird oder isScanning false ist
   useEffect(() => {
@@ -2148,6 +2307,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setSelectedFood({
       id: item.id,
       isRecipe: item.isRecipe,
+      timestamp: item.timestamp,
       name: item.name,
       calories: Math.round(Number(item.baseCalories ?? 0)),
       protein: Math.round(Number(item.baseProtein ?? 0) * 10) / 10,
@@ -2199,6 +2359,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     const entry = {
       id: food.id || generateId(),
       isRecipe: Boolean(food.isRecipe),
+      timestamp: food.timestamp || Date.now(),
       name: baseProps.name,
       instanceId: editingInstanceId || generateId(),
       amount: safeAmount,
@@ -2268,7 +2429,83 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setEditingInstanceId(null);
     setAmount(100);
   }, [amount, editingInstanceId, entryUnitMode, setDailyLog, setItemHistory]);
+  const openEmojiPicker = (current, onSelect) => {
+    triggerHaptic('light');
+    setCustomEmojiInput('');
+    setEmojiPickerConfig({ current: current || '🍽️', onSelect });
+  };
+
   return html`<div className="max-w-md mx-auto min-h-screen bg-slate-950 text-slate-100 px-6 pb-24 pt-[env(safe-area-inset-top,2.5rem)] relative overflow-hidden">
+    ${updateBanner.visible && html`
+      <div className="fixed top-0 left-0 right-0 z-[560] pointer-events-none">
+        <div className="w-full h-1 bg-slate-900/90 overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-brand-600 via-fuchsia-400 to-brand-400 transition-all duration-300 shadow-[0_0_12px_rgba(168,85,247,0.9)]" style=${{ width: `${updateBanner.progress}%` }}/>
+        </div>
+        <div className="flex justify-center mt-[calc(env(safe-area-inset-top,0.5rem)+0.35rem)] px-4 animate-in fade-in duration-200">
+          <div className="glass-card px-4 py-1.5 rounded-full border border-brand-500/30 shadow-[0_8px_25px_rgba(15,23,42,0.85)] flex items-center gap-2.5">
+            ${updateBanner.progress < 100
+              ? html`<${LoaderIcon} size=${13} className="text-brand-400"/>`
+              : html`<span className="text-emerald-400 text-xs font-black">✓</span>`}
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-200">${updateBanner.text}</span>
+            <div className="w-12 h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-brand-400 rounded-full transition-all duration-300" style=${{ width: `${updateBanner.progress}%` }}/>
+            </div>
+          </div>
+        </div>
+      </div>
+    `}
+    ${isThinking && !showAiModal && !selectedFood && html`
+      <div className="fixed inset-0 bg-slate-950/80 z-[540] backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200">
+        <div className="glass-card rounded-[2.2rem] px-8 py-6 border border-brand-500/30 shadow-2xl flex flex-col items-center gap-3 text-center">
+          <${LoaderIcon} size=${34} className="text-brand-400"/>
+          <div className="text-xs font-black uppercase tracking-widest text-white">Analysiere & lade Nährwerte...</div>
+        </div>
+      </div>
+    `}
+    ${emojiPickerConfig && html`
+      <div className="fixed inset-0 bg-slate-950/90 z-[550] backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-200" onClick=${() => setEmojiPickerConfig(null)}>
+        <div className="w-full max-w-xs glass-card rounded-[2.2rem] p-5 space-y-4 border border-white/10 shadow-2xl animate-in zoom-in duration-200" onClick=${e => e.stopPropagation()}>
+          <div className="flex justify-between items-center">
+            <h4 className="text-sm font-black uppercase tracking-wider text-white">Emoji wählen</h4>
+            <button onClick=${() => setEmojiPickerConfig(null)} className="p-1.5 bg-slate-800 rounded-full text-slate-300"><${XIcon} size=${16}/></button>
+          </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            ${['🍽️','🥗','🥩','🍗','🥚','🍳','🧀','🍞','🥐','🥨','🥞','🥣','🍝','🍚','🥔','🍕','🍔','🌯','🌮','🍣','🍎','🍌','🥑','🥤','☕','🍫','🍪','⚡'].map(em => html`
+              <button
+                key=${em}
+                type="button"
+                onClick=${() => {
+                  triggerHaptic('light');
+                  emojiPickerConfig.onSelect(em);
+                  setEmojiPickerConfig(null);
+                }}
+                className=${`aspect-square rounded-xl flex items-center justify-center text-xl active:scale-90 transition-all border ${emojiPickerConfig.current === em ? 'bg-brand-500/30 border-brand-400' : 'bg-slate-900/70 border-white/5 hover:bg-slate-800'}`}
+              >${em}</button>
+            `)}
+          </div>
+          <div className="flex gap-2 pt-1 border-t border-white/10">
+            <input
+              type="text"
+              placeholder="Eigenes Emoji tippen..."
+              value=${customEmojiInput}
+              onChange=${e => setCustomEmojiInput(e.target.value)}
+              className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-center text-base text-white outline-none focus:border-brand-400"
+            />
+            <button
+              type="button"
+              onClick=${() => {
+                if (customEmojiInput.trim()) {
+                  const chosen = [...customEmojiInput.trim()][0];
+                  if (chosen) emojiPickerConfig.onSelect(chosen);
+                }
+                setEmojiPickerConfig(null);
+              }}
+              className="px-4 py-2 bg-brand-500 text-slate-950 font-black text-xs uppercase rounded-xl active:scale-95"
+            >OK</button>
+          </div>
+        </div>
+      </div>
+    `}
     ${showSuccess && html`<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[500] bg-brand-500 text-slate-950 px-8 py-4 rounded-full font-black flex items-center gap-3 shadow-2xl animate-success-fade"><${CheckIcon} size=${24} strokeWidth=${3}/> ${successMessage}</div>`}
     ${showDetails && (() => {
       const portionGrams = Math.round(Number(showDetails?.amount || (showDetails?.amountFactor ? showDetails.amountFactor * 100 : 100)));
@@ -2370,14 +2607,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       }}/>
       <div className="fixed bottom-2.5 left-2.5 right-2.5 z-[460] glass-card rounded-[2.5rem] p-4 sm:p-5 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto">
         <div className="flex items-center gap-3 mb-3">
-          <button onClick=${() => {
-            triggerHaptic('light');
-            const input = prompt("Wähle ein Emoji:", selectedFood?.emoji || "🍽️");
-            if (input) {
-              const newEmoji = [...input.trim()][0];
-              setSelectedFood(prev => ({ ...prev, emoji: newEmoji }));
-            }
-          }} className="w-11 h-11 shrink-0 bg-slate-800/80 rounded-[1.1rem] flex items-center justify-center text-2xl border border-white/10 shadow-inner hover:bg-slate-700 transition-colors">${selectedFood?.emoji || "🍽️"}</button>
+          <button onClick=${() => openEmojiPicker(selectedFood?.emoji || "🍽️", newEmoji => setSelectedFood(prev => ({ ...prev, emoji: newEmoji })))} className="w-11 h-11 shrink-0 bg-slate-800/80 rounded-[1.1rem] flex items-center justify-center text-2xl border border-white/10 shadow-inner hover:bg-slate-700 transition-colors">${selectedFood?.emoji || "🍽️"}</button>
           <input type="text" value=${selectedFood?.name || ""} placeholder="Name des Essens" onChange=${e => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent flex-1 min-w-0 text-xl sm:text-2xl font-black text-white outline-none border-b border-white/10 focus:border-brand-500"/>
           <button type="button" onClick=${() => {
             triggerHaptic('light');
@@ -2554,7 +2784,16 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             <div className="border-r border-b border-white/5 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-400">🥑 Fett</div>
             <div className="border-r border-b border-white/5 p-1 flex items-center">
               <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-400 w-full">
-                <input type="number" inputMode="decimal" value=${selectedFood?.fat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, fat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+                <input type="number" inputMode="decimal" value=${selectedFood?.fat ?? 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => {
+                  const rawVal = e.target.value.replace(/^0+(?=\d)/, '');
+                  const numFat = Number(rawVal) || 0;
+                  const numSat = Number(selectedFood?.saturatedFat) || 0;
+                  setSelectedFood({
+                    ...selectedFood,
+                    fat: rawVal,
+                    unsaturatedFat: Math.max(0, Math.round((numFat - numSat) * 10) / 10)
+                  });
+                }} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
                 <span className="text-[10px] pointer-events-none">g</span>
               </div>
             </div>
@@ -2576,7 +2815,16 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             <div className="border-r border-white/10 px-2.5 py-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] sm:text-xs font-semibold text-amber-600"><span className="text-[9px] text-slate-500 font-normal select-none -mr-0.5">↳</span> 🧈 gesättigt</div>
             <div className="border-r border-white/10 p-1 flex items-center">
               <div className="bg-slate-800/90 hover:bg-slate-800 border border-white/10 rounded-xl px-1.5 py-1 flex items-center justify-center gap-1 focus-within:ring-1 focus-within:ring-amber-400/60 transition-all text-amber-600 w-full">
-                <input type="number" inputMode="decimal" value=${selectedFood?.saturatedFat !== undefined ? (typeof selectedFood.saturatedFat === 'number' ? Math.round(selectedFood.saturatedFat * 10) / 10 : selectedFood.saturatedFat) : 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => setSelectedFood({...selectedFood, saturatedFat: e.target.value.replace(/^0+(?=\d)/, '')})} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
+                <input type="number" inputMode="decimal" value=${selectedFood?.saturatedFat !== undefined ? (typeof selectedFood.saturatedFat === 'number' ? Math.round(selectedFood.saturatedFat * 10) / 10 : selectedFood.saturatedFat) : 0} onFocus=${e => setTimeout(() => e.target.select(), 50)} onChange=${e => {
+                  const rawVal = e.target.value.replace(/^0+(?=\d)/, '');
+                  const numSat = Number(rawVal) || 0;
+                  const numFat = Number(selectedFood?.fat) || 0;
+                  setSelectedFood({
+                    ...selectedFood,
+                    saturatedFat: rawVal,
+                    unsaturatedFat: Math.max(0, Math.round((numFat - numSat) * 10) / 10)
+                  });
+                }} className="bg-transparent text-center text-xs font-bold w-full outline-none focus:text-white"/>
                 <span className="text-[10px] pointer-events-none">g</span>
               </div>
             </div>
@@ -2587,7 +2835,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full mt-3 sm:mt-3.5 bg-brand-500 text-slate-950 py-3.5 sm:py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
       </div>`;
     })()}
-    ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-6 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
+    ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-4 mt-1"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
   <button onClick=${() => {
     triggerHaptic('light');
     setSelectedDate(addDaysToDateStr(selectedDate, -1));
@@ -2605,7 +2853,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     triggerHaptic('light');
     setSelectedDate(addDaysToDateStr(selectedDate, 1));
   }} className="p-1 text-slate-500 hover:text-white active:scale-90 transition-all"><${ArrowRightIcon} size=${14}/></button>
-</div></div><div className="flex gap-2"><button onClick=${() => { triggerHaptic('light'); setShowAiCoach(true); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400" title="KI-Coach"><${SparklesIcon} size=${20}/></button><button onClick=${() => { triggerHaptic('light'); setView('profile'); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg" title="Profil & Ziele"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-5 sm:p-6 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-6"><${ProgressRing} consumed=${totals.kcal} burned=${totals.burnedKcal} target=${user.target}/></div><div className="space-y-3 w-full"><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪🏼 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 Zucker" value=${totals.s} color="text-blue-600 dark:text-blue-500" valueSuffix=${totals.s >= 50 ? "⚠️" : null} animate=${totals.s >= 50}/></div></div><div className="p-4 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-3"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 space-y-1.5"><${SubMacroRow} label="🧈 gesättigt" value=${totals.sf} color="text-amber-600"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-amber-200"/></div></div></div></div>
+</div></div><div className="flex gap-2"><button onClick=${() => { triggerHaptic('light'); setShowAiCoach(true); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg text-brand-400" title="KI-Coach"><${SparklesIcon} size=${20}/></button><button onClick=${() => { triggerHaptic('light'); setView('profile'); }} className="p-3 glass-card rounded-[1.2rem] border border-white/10 active:scale-90 transition-all shadow-lg" title="Profil & Ziele"><${UserIcon} size=${20} className="text-brand-400"/></button></div></div><div className="glass-card rounded-[2.5rem] p-4 sm:p-5 mb-4 shadow-2xl relative overflow-hidden"><div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-brand-500/10 blur-3xl -z-10"/><div className="flex flex-col items-center mb-4"><${ProgressRing} consumed=${totals.kcal} burned=${totals.burnedKcal} target=${user.target}/></div><div className="space-y-2.5 w-full"><div className="p-3.5 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner"><${MacroBar} label="💪🏼 Protein" value=${totals.p} target=${user.targetP} color="bg-fuchsia-400"/></div><div className="p-3.5 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-2.5"><${MacroBar} label="🍞 Kohlenhydrate" value=${totals.c} target=${user.targetC} color="bg-blue-400"/><div className="pt-2 border-t border-white/10"><${SubMacroRow} label="🍭 Zucker" value=${totals.s} color="text-blue-600 dark:text-blue-500" valueSuffix=${totals.s >= 50 ? "⚠️" : null} animate=${totals.s >= 50}/></div></div><div className="p-3.5 rounded-[1.5rem] bg-slate-900/60 border border-white/5 shadow-inner space-y-2.5"><${MacroBar} label="🥑 Fett" value=${totals.f} target=${user.targetF} color="bg-amber-400"/><div className="pt-2 border-t border-white/10 grid grid-cols-2 gap-3"><${SubMacroRow} label="🧈 gesättigt" value=${totals.sf} color="text-amber-600"/><${SubMacroRow} label="🌱 ungesättigt" value=${totals.uf} color="text-amber-200"/></div></div></div></div>
 <button onClick=${() => { triggerHaptic('light'); setView('addFood'); }} className="fixed bottom-6 right-6 z-[100] w-16 h-16 bg-brand-500 text-slate-950 rounded-[2rem] flex items-center justify-center shadow-xl active:scale-90 transition-all">
     <${PlusIcon} size=${30} strokeWidth=${3} />
 </button>
@@ -2672,7 +2920,13 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
               <div className="text-sm font-bold text-white">Noch keine Rezepte erstellt</div>
               <p className="text-xs text-slate-500 leading-relaxed">Tippe oben auf <span className="text-brand-400 font-bold">„Neues Rezept erstellen“</span>, um deine eigenen Mahlzeiten mit Zutaten zusammenzustellen!</p>
             </div>
-          ` : recipes.map(rec => html`
+          ` : recipes.map(rec => {
+            const rWeight = rec.pieceWeight || rec.totalWeight || 100;
+            const rKcal = Math.round((Number(rec.baseCalories ?? rec.calories ?? 0)) * (rWeight / 100));
+            const rP = Math.round((Number(rec.baseProtein ?? rec.protein ?? 0)) * (rWeight / 100));
+            const rC = Math.round((Number(rec.baseCarbs ?? rec.carbs ?? 0)) * (rWeight / 100));
+            const rF = Math.round((Number(rec.baseFat ?? rec.fat ?? 0)) * (rWeight / 100));
+            return html`
             <${SwipeableItem}
               key=${rec.id}
               onSelect=${() => selectFood(rec)}
@@ -2685,7 +2939,13 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                   </div>
                   <div className="flex-1 min-w-0 py-0.5">
                     <div className="font-bold text-sm text-white break-words leading-snug">${rec.name}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${rec.totalWeight || rec.pieceWeight || 100}g | ${rec.totalCalories || rec.calories} kcal</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase truncate flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <span>${rWeight}g · <span className="text-white">${rKcal} kcal</span></span>
+                      <span className="text-slate-700">|</span>
+                      <span className="text-fuchsia-400/90">P ${rP}g</span>
+                      <span className="text-blue-400/90">C ${rC}g</span>
+                      <span className="text-amber-400/90">F ${rF}g</span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 ml-2" onClick=${e => e.stopPropagation()}>
@@ -2708,12 +2968,16 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 </div>
               </div>
             </${SwipeableItem}>
-          `)}
+          `;
+          })}
         </div>
       ` : (activeTab === 'frequent' ? frequentItems : recentItems).map(item => {
         const uInfo = getSmartFoodUnit(item);
         const portionWeight = item.lastAmount || (uInfo ? uInfo.pieceWeight : 100);
         const portionCalories = Math.round((Number(item.baseCalories ?? item.calories ?? 0)) * (portionWeight / 100));
+        const portionP = Math.round((Number(item.baseProtein ?? item.protein ?? 0)) * (portionWeight / 100));
+        const portionC = Math.round((Number(item.baseCarbs ?? item.carbs ?? 0)) * (portionWeight / 100));
+        const portionF = Math.round((Number(item.baseFat ?? item.fat ?? 0)) * (portionWeight / 100));
         const portionDisplay = formatFoodAmountDisplay({ ...item, amount: portionWeight, amountDisplay: null });
         return html`
           <${SwipeableItem}
@@ -2728,7 +2992,13 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 </div>
                 <div className="flex-1 min-w-0 py-0.5">
                   <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-                  <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionDisplay} | ${portionCalories} kcal</div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase truncate flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <span>${portionDisplay} · <span className="text-white">${portionCalories} kcal</span></span>
+                    <span className="text-slate-700">|</span>
+                    <span className="text-fuchsia-400/90">P ${portionP}g</span>
+                    <span className="text-blue-400/90">C ${portionC}g</span>
+                    <span className="text-amber-400/90">F ${portionF}g</span>
+                  </div>
                 </div>
               </div>
               <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
@@ -2749,6 +3019,9 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           const uInfo = getSmartFoodUnit(f);
           const portionWeight = f.lastAmount || (uInfo ? uInfo.pieceWeight : 100);
           const portionCalories = Math.round((Number(f.baseCalories ?? f.calories ?? 0)) * (portionWeight / 100));
+          const portionP = Math.round((Number(f.baseProtein ?? f.protein ?? 0)) * (portionWeight / 100));
+          const portionC = Math.round((Number(f.baseCarbs ?? f.carbs ?? 0)) * (portionWeight / 100));
+          const portionF = Math.round((Number(f.baseFat ?? f.fat ?? 0)) * (portionWeight / 100));
           const portionDisplay = formatFoodAmountDisplay({ ...f, amount: portionWeight, amountDisplay: null });
           return html`
             <${SwipeableItem}
@@ -2772,7 +3045,13 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                       <span>${f.name}</span>
                       ${f.isRecipe ? html`<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">Rezept</span>` : ''}
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionDisplay} | ${portionCalories} kcal</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase truncate flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <span>${portionDisplay} · <span className="text-white">${portionCalories} kcal</span></span>
+                      <span className="text-slate-700">|</span>
+                      <span className="text-fuchsia-400/90">P ${portionP}g</span>
+                      <span className="text-blue-400/90">C ${portionC}g</span>
+                      <span className="text-amber-400/90">F ${portionF}g</span>
+                    </div>
                   </div>
                 </div>
                 <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
@@ -2837,11 +3116,11 @@ ${showRecipeModal && (() => {
       <div className="flex items-center gap-3">
         <button onClick=${() => {
           triggerHaptic('light');
-          const input = prompt("Wähle ein Emoji (oder leer lassen für KI):", recipeDraft.emoji || "🥗");
-          if (input) {
-            const newEmoji = [...input.trim()][0];
-            setRecipeDraft(prev => ({ ...prev, emoji: newEmoji }));
-          }
+          openEmojiPicker(
+            recipeDraft.emoji || "🥗",
+            newEmoji => setRecipeDraft(prev => ({ ...prev, emoji: newEmoji })),
+            () => fetchEmojiForProduct(recipeDraft.name || "Salat")
+          );
         }} className="w-12 h-12 shrink-0 bg-slate-800/80 rounded-2xl flex items-center justify-center text-2xl border border-white/10 shadow-inner">${recipeDraft.emoji || '🥗'}</button>
         <input 
           type="text" 
@@ -2991,9 +3270,12 @@ ${showRecipeModal && (() => {
                     triggerHaptic('light');
                     addIngredientToDraft();
                   }}
-                  className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-black text-xs rounded-xl uppercase tracking-wider active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5"
+                  disabled=${isAddingIngredient}
+                  className="w-full py-3 bg-brand-600 hover:bg-brand-500 disabled:opacity-60 text-white font-black text-xs rounded-xl uppercase tracking-wider active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5"
                 >
-                  <${PlusIcon} size=${15}/> Zutat hinzufügen (${draftIngGrams || 100}g)
+                  ${isAddingIngredient
+                    ? html`<${LoaderIcon} size=${15}/> KI berechnet Zutat...`
+                    : html`<${PlusIcon} size=${15}/> Zutat hinzufügen (${draftIngGrams || 100}g)`}
                 </button>
               </div>
             `;
@@ -3136,11 +3418,10 @@ ${showActivityModal && html`
           <div className="flex items-center gap-3.5">
             <button onClick=${() => {
               triggerHaptic('light');
-              const input = prompt("Wähle ein Emoji:", activityDraft?.emoji || "⚡");
-              if (input) {
-                const newEmoji = [...input.trim()][0];
-                setActivityDraft(p => ({ ...p, emoji: newEmoji }));
-              }
+              openEmojiPicker(
+                activityDraft?.emoji || "⚡",
+                newEmoji => setActivityDraft(p => ({ ...p, emoji: newEmoji }))
+              );
             }} className="w-12 h-12 shrink-0 bg-amber-500/15 rounded-2xl flex items-center justify-center text-2xl border border-amber-500/30 shadow-inner text-amber-400">
               ${activityDraft?.emoji || '⚡'}
             </button>
@@ -3356,7 +3637,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.4 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.5 Live</span>
     </div>
     <button 
       type="button" 
@@ -3542,7 +3823,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.4').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=3.5').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));

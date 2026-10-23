@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kalorien-zaehler-v3.4';
+const CACHE_NAME = 'kalorien-zaehler-v3.5';
 const STATIC_ASSETS = [
   './',
   './index.html',
