@@ -616,7 +616,7 @@ const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => {
         </div>
         <div className="flex-1 min-w-0 py-0.5">
           <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-          <div className=${`text-[10px] font-black uppercase truncate mt-0.5 ${item.isActivity ? 'text-amber-400/90' : 'text-slate-400'}`}>
+          <div className=${`text-[11px] font-black truncate mt-0.5 ${item.isActivity ? 'text-amber-400/90' : 'text-slate-400'}`}>
             ${item.isActivity 
               ? `${timeStr ? `${timeStr} · ` : ''}${item.durationMinutes ? `${item.durationMinutes} Min Training` : 'Aktivität'}`
               : `${timeStr ? `${timeStr} · ` : ''}${formatFoodAmountDisplay(item)}`}
@@ -628,13 +628,13 @@ const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => {
           <div className="text-sm font-black text-amber-400 whitespace-nowrap">-${Math.round(item.burnedCalories || item.calories || 0)} <span className="text-[10px] font-bold">kcal</span></div>
           <div className="text-[9px] font-black uppercase text-amber-500/80 tracking-wider mt-0.5">⚡ Verbrannt</div>
         ` : html`
-          <div className="text-sm font-black text-white whitespace-nowrap">${Math.round(item.calories)} <span className="text-[10px] font-bold text-brand-400">kcal</span></div>
+          <div className="text-sm font-black text-brand-400 whitespace-nowrap">${Math.round(item.calories)} <span className="text-[10px] font-bold text-brand-400">kcal</span></div>
           <div className="flex items-center gap-1 text-[9px] font-black mt-0.5 whitespace-nowrap">
-            <span className="text-fuchsia-400">${Math.round(item.protein || 0)}P</span>
+            <span className="text-fuchsia-400">P ${Math.round(item.protein || 0)}g</span>
             <span className="text-slate-600">·</span>
-            <span className="text-blue-400">${Math.round(item.carbs || 0)}C</span>
+            <span className="text-blue-400">K ${Math.round(item.carbs || 0)}g</span>
             <span className="text-slate-600">·</span>
-            <span className="text-amber-400">${Math.round(item.fat || 0)}F</span>
+            <span className="text-amber-400">F ${Math.round(item.fat || 0)}g</span>
           </div>
         `}
       </div>
@@ -1159,7 +1159,7 @@ function App() {
                 setUpdateBanner({ visible: true, progress: 100, text: 'Update bereit – starte neu...' });
                 reg.waiting.postMessage('SKIP_WAITING');
               } else if (sw.state === 'activated' || sw.state === 'redundant') {
-                setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.5 ist aktuell ✓' });
+                setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.6 ist aktuell ✓' });
                 setTimeout(() => setUpdateBanner(p => ({ ...p, visible: false })), 600);
               }
             });
@@ -1173,7 +1173,7 @@ function App() {
       clearTimeout(t1);
       clearTimeout(t2);
       if (!foundNew) {
-        setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.5 ist aktuell ✓' });
+        setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.6 ist aktuell ✓' });
         setTimeout(() => {
           setUpdateBanner(p => ({ ...p, visible: false }));
         }, 650);
@@ -2435,14 +2435,14 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     setEmojiPickerConfig({ current: current || '🍽️', onSelect });
   };
 
-  return html`<div className="max-w-md mx-auto min-h-screen bg-slate-950 text-slate-100 px-6 pb-24 pt-[env(safe-area-inset-top,2.5rem)] relative overflow-hidden">
+  return html`<div className="max-w-md mx-auto min-h-screen bg-slate-950 text-slate-100 px-6 pb-24 relative overflow-hidden" style=${{ paddingTop: 'calc(max(env(safe-area-inset-top, 0px), 2.25rem) + 0.85rem)' }}>
     ${updateBanner.visible && html`
       <div className="fixed top-0 left-0 right-0 z-[560] pointer-events-none">
         <div className="w-full h-1 bg-slate-900/90 overflow-hidden">
           <div className="h-full bg-gradient-to-r from-brand-600 via-fuchsia-400 to-brand-400 transition-all duration-300 shadow-[0_0_12px_rgba(168,85,247,0.9)]" style=${{ width: `${updateBanner.progress}%` }}/>
         </div>
-        <div className="flex justify-center mt-[calc(env(safe-area-inset-top,0.5rem)+0.35rem)] px-4 animate-in fade-in duration-200">
-          <div className="glass-card px-4 py-1.5 rounded-full border border-brand-500/30 shadow-[0_8px_25px_rgba(15,23,42,0.85)] flex items-center gap-2.5">
+        <div className="flex justify-center px-4 animate-in fade-in duration-200" style=${{ marginTop: 'calc(max(env(safe-area-inset-top, 0px), 1.5rem) + 0.35rem)' }}>
+          <div className="bg-slate-900/95 px-4 py-1.5 rounded-full border border-brand-500/30 shadow-[0_8px_25px_rgba(15,23,42,0.9)] flex items-center gap-2.5">
             ${updateBanner.progress < 100
               ? html`<${LoaderIcon} size=${13} className="text-brand-400"/>`
               : html`<span className="text-emerald-400 text-xs font-black">✓</span>`}
@@ -2835,7 +2835,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full mt-3 sm:mt-3.5 bg-brand-500 text-slate-950 py-3.5 sm:py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
       </div>`;
     })()}
-    ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-4 mt-1"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
+    ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-4 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
   <button onClick=${() => {
     triggerHaptic('light');
     setSelectedDate(addDaysToDateStr(selectedDate, -1));
@@ -2939,12 +2939,17 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                   </div>
                   <div className="flex-1 min-w-0 py-0.5">
                     <div className="font-bold text-sm text-white break-words leading-snug">${rec.name}</div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase truncate flex items-center gap-1.5 flex-wrap mt-0.5">
-                      <span>${rWeight}g · <span className="text-white">${rKcal} kcal</span></span>
-                      <span className="text-slate-700">|</span>
-                      <span className="text-fuchsia-400/90">P ${rP}g</span>
-                      <span className="text-blue-400/90">C ${rC}g</span>
-                      <span className="text-amber-400/90">F ${rF}g</span>
+                    <div className="text-[11px] font-black text-slate-400 truncate mt-0.5">
+                      <span>${rWeight}g</span>
+                      <span className="mx-1.5 text-slate-600">|</span>
+                      <span className="text-brand-400">${rKcal} kcal</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-black whitespace-nowrap truncate mt-0.5">
+                      <span className="text-fuchsia-400">P ${rP}g</span>
+                      <span className="text-slate-600">·</span>
+                      <span className="text-blue-400">K ${rC}g</span>
+                      <span className="text-slate-600">·</span>
+                      <span className="text-amber-400">F ${rF}g</span>
                     </div>
                   </div>
                 </div>
@@ -2992,12 +2997,17 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 </div>
                 <div className="flex-1 min-w-0 py-0.5">
                   <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-                  <div className="text-[10px] font-black text-slate-500 uppercase truncate flex items-center gap-1.5 flex-wrap mt-0.5">
-                    <span>${portionDisplay} · <span className="text-white">${portionCalories} kcal</span></span>
-                    <span className="text-slate-700">|</span>
-                    <span className="text-fuchsia-400/90">P ${portionP}g</span>
-                    <span className="text-blue-400/90">C ${portionC}g</span>
-                    <span className="text-amber-400/90">F ${portionF}g</span>
+                  <div className="text-[11px] font-black text-slate-400 truncate mt-0.5">
+                    <span>${portionDisplay}</span>
+                    <span className="mx-1.5 text-slate-600">|</span>
+                    <span className="text-brand-400">${portionCalories} kcal</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-black whitespace-nowrap truncate mt-0.5">
+                    <span className="text-fuchsia-400">P ${portionP}g</span>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-blue-400">K ${portionC}g</span>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-amber-400">F ${portionF}g</span>
                   </div>
                 </div>
               </div>
@@ -3045,12 +3055,17 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                       <span>${f.name}</span>
                       ${f.isRecipe ? html`<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">Rezept</span>` : ''}
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase truncate flex items-center gap-1.5 flex-wrap mt-0.5">
-                      <span>${portionDisplay} · <span className="text-white">${portionCalories} kcal</span></span>
-                      <span className="text-slate-700">|</span>
-                      <span className="text-fuchsia-400/90">P ${portionP}g</span>
-                      <span className="text-blue-400/90">C ${portionC}g</span>
-                      <span className="text-amber-400/90">F ${portionF}g</span>
+                    <div className="text-[11px] font-black text-slate-400 truncate mt-0.5">
+                      <span>${portionDisplay}</span>
+                      <span className="mx-1.5 text-slate-600">|</span>
+                      <span className="text-brand-400">${portionCalories} kcal</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-black whitespace-nowrap truncate mt-0.5">
+                      <span className="text-fuchsia-400">P ${portionP}g</span>
+                      <span className="text-slate-600">·</span>
+                      <span className="text-blue-400">K ${portionC}g</span>
+                      <span className="text-slate-600">·</span>
+                      <span className="text-amber-400">F ${portionF}g</span>
                     </div>
                   </div>
                 </div>
@@ -3285,8 +3300,8 @@ ${showRecipeModal && (() => {
 
       ${recipeDraft.ingredients.length > 0 && html`
         <div className="p-4 bg-slate-900 rounded-2xl border border-white/5 space-y-1 text-center">
-          <div className="text-sm font-black text-white">Gesamt: ${totalKcal} kcal <span className="text-slate-400 text-xs font-medium">(${totalGrams}g)</span></div>
-          <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider">P: ${totalP}g | C: ${totalC}g | F: ${totalF}g</div>
+          <div className="text-sm font-black text-white">Gesamt: <span className="text-brand-400">${totalKcal} kcal</span> <span className="text-slate-400 text-xs font-medium">(${totalGrams}g)</span></div>
+          <div className="text-[10px] font-black text-slate-400 tracking-wider">P: ${totalP}g | K: ${totalC}g | F: ${totalF}g</div>
           ${(recipeDraft.servings || 1) > 1 && html`
             <div className="text-[11px] font-bold text-brand-400 pt-1">↳ Pro Portion: ${Math.round(totalKcal / recipeDraft.servings)} kcal (P: ${(totalP / recipeDraft.servings).toFixed(1)}g)</div>
           `}
@@ -3637,7 +3652,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.5 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.6 Live</span>
     </div>
     <button 
       type="button" 
@@ -3823,7 +3838,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.5').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=3.6').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
