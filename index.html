@@ -1159,7 +1159,7 @@ function App() {
                 setUpdateBanner({ visible: true, progress: 100, text: 'Update bereit – starte neu...' });
                 reg.waiting.postMessage('SKIP_WAITING');
               } else if (sw.state === 'activated' || sw.state === 'redundant') {
-                setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.6 ist aktuell ✓' });
+                setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.7 ist aktuell ✓' });
                 setTimeout(() => setUpdateBanner(p => ({ ...p, visible: false })), 600);
               }
             });
@@ -1173,7 +1173,7 @@ function App() {
       clearTimeout(t1);
       clearTimeout(t2);
       if (!foundNew) {
-        setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.6 ist aktuell ✓' });
+        setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.7 ist aktuell ✓' });
         setTimeout(() => {
           setUpdateBanner(p => ({ ...p, visible: false }));
         }, 650);
@@ -3652,7 +3652,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.6 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.7 Live</span>
     </div>
     <button 
       type="button" 
@@ -3733,7 +3733,7 @@ ${showCalendarModal && (() => {
               setShowCalendarModal(false);
             }} className=${baseClass}>
               <span>${day}</span>
-              ${isToday && html`<span className="absolute bottom-1 w-1 h-1 rounded-full bg-current"/>`}
+              ${isToday && html`<span className=${`absolute bottom-1 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-brand-400 shadow-[0_0_6px_rgba(167,139,250,0.8)]'}`}/>`}
             </button>
           `;
         })}
@@ -3838,7 +3838,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.6').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=3.7').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
