@@ -141,6 +141,22 @@ const EditIcon = p => html`<${Icon} d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1
 
 // --- HELPERS ---
 const generateId = () => typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
+const extractFirstEmoji = (str, fallback = '🍽️') => {
+  if (!str) return fallback;
+  const trimmed = String(str).trim();
+  if (!trimmed) return fallback;
+  try {
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      const seg = new Intl.Segmenter('de', { granularity: 'grapheme' });
+      for (const { segment } of seg.segment(trimmed)) {
+        if (/\p{Extended_Pictographic}/u.test(segment)) return segment;
+      }
+      const first = seg.segment(trimmed)[Symbol.iterator]().next();
+      if (first && first.value && first.value.segment) return first.value.segment;
+    }
+  } catch (e) {}
+  return [...trimmed][0] || fallback;
+};
 const getItemDisplay = (item, isLarge = false) => {
   if (item.emoji) return html`<div className=${`flex items-center justify-center w-full h-full ${isLarge ? 'text-3xl' : 'text-xl'}`}>${item.emoji}</div>`;
   if (item.image) return html`<img src=${item.image} alt=${item.name} loading="lazy" className=${`w-full h-full object-cover ${isLarge ? 'rounded-2xl' : 'rounded-xl'}`}/>`;
@@ -1141,7 +1157,7 @@ function App() {
   const [emojiPickerConfig, setEmojiPickerConfig] = useState(null);
   const [customEmojiInput, setCustomEmojiInput] = useState('');
   const [isAddingIngredient, setIsAddingIngredient] = useState(false);
-  const CURRENT_APP_VERSION = 'v4.1';
+  const CURRENT_APP_VERSION = 'v4.2';
   const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Neues Update verfügbar...' });
   const lastUpdateCheckRef = useRef(0);
 
@@ -1399,13 +1415,20 @@ function App() {
       } else if (user.geminiApiKey) {
         setIsAddingIngredient(true);
         try {
-          const prompt = `Gib die Nährwerte pro 100g für die Zutat "${rawName}" sowie ein einzelnes passendes Emoji als JSON zurück: {"name":"${rawName}","emoji":"🍽️","calories":int,"protein":float,"carbs":float,"sugar":float,"fat":float,"saturatedFat":float}`;
+          const prompt = `Bestimme die realistischen Nährwerte für exakt 100 Gramm der Zutat "${rawName}".
+REGELN:
+1. "name": Sauberer deutscher Name der Zutat (großgeschrieben, OHNE Mengenangaben wie "100g" oder Stückzahlen im Namen).
+2. Alle Werte ("calories", "protein", "carbs", "sugar", "fat", "saturatedFat", "unsaturatedFat") gelten AUSNAHMSLOS für exakt 100g.
+3. Physikalische Konsistenz: "sugar" <= "carbs", "saturatedFat" <= "fat", "unsaturatedFat" = ungesättigte Fettsäuren (ca. fat - saturatedFat), und "calories" muss zu (protein*4 + carbs*4 + fat*9) passen.
+4. "emoji": Genau ein passendes Emoji.
+Antworte AUSSCHLIESSLICH mit validem JSON:
+{"name":"string","emoji":"🍽️","calories":int,"protein":float,"carbs":float,"sugar":float,"fat":float,"saturatedFat":float,"unsaturatedFat":float}`;
           const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { response_mime_type: "application/json" }
+              generationConfig: { response_mime_type: "application/json", temperature: 0.2 }
             })
           });
           const data = await res.json();
@@ -1413,18 +1436,23 @@ function App() {
           const match = txt.match(/\{[\s\S]*\}/);
           if (match) {
             const parsed = JSON.parse(match[0]);
-            const fVal = Number(parsed.fat) || 0;
-            const sfVal = Number(parsed.saturatedFat) || 0;
+            const cVal = Math.max(0, Number(parsed.carbs) || 0);
+            const sVal = Math.min(cVal, Math.max(0, Number(parsed.sugar) || 0));
+            const fVal = Math.max(0, Number(parsed.fat) || 0);
+            const sfVal = Math.min(fVal, Math.max(0, Number(parsed.saturatedFat) || 0));
+            const ufVal = parsed.unsaturatedFat !== undefined
+              ? Math.min(Math.max(0, fVal - sfVal), Math.max(0, Number(parsed.unsaturatedFat) || 0))
+              : Math.max(0, Math.round((fVal - sfVal) * 10) / 10);
             targetFood = {
-              name: parsed.name || rawName,
-              emoji: parsed.emoji ? [...String(parsed.emoji).trim()][0] : '🍽️',
-              calories: Number(parsed.calories) || 100,
-              protein: Number(parsed.protein) || 0,
-              carbs: Number(parsed.carbs) || 0,
-              sugar: Number(parsed.sugar) || 0,
+              name: (parsed.name || rawName).trim(),
+              emoji: extractFirstEmoji(parsed.emoji, '🍽️'),
+              calories: Math.max(0, Math.round(Number(parsed.calories) || 100)),
+              protein: Math.max(0, Number(parsed.protein) || 0),
+              carbs: cVal,
+              sugar: sVal,
               fat: fVal,
               saturatedFat: sfVal,
-              unsaturatedFat: Math.max(0, Math.round((fVal - sfVal) * 10) / 10)
+              unsaturatedFat: ufVal
             };
           }
         } catch (e) {
@@ -1790,7 +1818,7 @@ function App() {
       const age = aiGoalForm.age || 25;
       const gender = aiGoalForm.gender || 'männlich';
 
-      const prompt = `Du bist ein sportwissenschaftlicher KI-Trainer. Schätze den Kalorienverbrauch für folgende Aktivität basierend auf den Personendaten.
+      const prompt = `Du bist ein präziser sportwissenschaftlicher KI-Trainer. Berechne den realistischen zusätzlichen Kalorienverbrauch (Netto-Arbeitsumsatz) für folgende Aktivität basierend auf den Personendaten.
 Personendaten:
 - Geschlecht: ${gender}
 - Alter: ${age} Jahre
@@ -1799,13 +1827,17 @@ Personendaten:
 
 Aktivität: "${textToAnalyze}"
 
-Berechne den realistischen Kalorienverbrauch (MET-basiert).
+WICHTIGE BERECHNUNGSREGELN:
+1. NETTO-ZUSATZVERBRAUCH: Berechne den aktiven Mehrverbrauch durch den Sport (Netto-MET = Gesamt-MET minus 1,0 Ruhe-MET), da der Grundumsatz bereits im Tagesziel des Nutzers enthalten ist.
+2. REALISTISCHE PAUSEN: Berücksichtige bei Krafttraining, Fitnessstudio oder Spielsportarten realistische Satz- und Erholungspausen (z.B. 45-60 Min Krafttraining verbraucht netto meist ca. 180-320 kcal je nach Körpergewicht, nicht 600+ kcal).
+3. DAUER & NAME: Falls in "${textToAnalyze}" keine Dauer genannt wurde, wähle eine typische Standarddauer (z.B. 45 Min für Krafttraining/Sport, 30 Min für Joggen/Cardio). Formuliere "name" sauber und kompakt auf Deutsch (z.B. "45 Min Krafttraining Oberkörper" oder "30 Min Joggen").
+
 Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
 {
   "name": "Präziser Name der Aktivität (z.B. 45 Min Krafttraining Oberkörper)",
   "emoji": "Passendes einzelnes Emoji (z.B. 🏋️‍♂️, 🏃, 🚴, 🏊, ⚽, 🧘, 🚶)",
-  "durationMinutes": 45,
-  "burnedCalories": 280,
+  "durationMinutes": int,
+  "burnedCalories": int,
   "intensity": "leicht" | "moderat" | "intensiv"
 }`;
 
@@ -1814,7 +1846,7 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { response_mime_type: "application/json" }
+          generationConfig: { response_mime_type: "application/json", temperature: 0.2 }
         })
       });
 
@@ -1827,7 +1859,7 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
       const parsed = JSON.parse(rawText);
       setActivityDraft({
         name: parsed.name || textToAnalyze,
-        emoji: parsed.emoji || '⚡',
+        emoji: extractFirstEmoji(parsed.emoji, '⚡'),
         durationMinutes: Number(parsed.durationMinutes) || 30,
         burnedCalories: Number(parsed.burnedCalories) || 200,
         intensity: parsed.intensity || 'moderat'
@@ -1910,19 +1942,34 @@ Antworte AUSSCHLIESSLICH mit reinem JSON in folgendem Format:
     if (!user.geminiApiKey) return alert("Bitte hinterlege deinen API Key unten im Profil!");
     setIsAiGoalLoading(true);
     try {
-      const prompt = `Du bist ein präziser Ernährungsrechner. Berechne basierend auf folgenden Nutzerdaten den täglichen Kalorienbedarf (target) sowie die optimalen Makronährstoff-Ziele für Protein (targetP), Kohlenhydrate (targetC) und Fett (targetF) in Gramm.
-WICHTIG: Wenn das Ziel 'Abnehmen & Muskelaufbau gleichzeitig' lautet, wähle einen intelligenten Verteilungsschlüssel für eine Body Recomposition (deutlich höherer Proteinfokus bei moderatem Kaloriendefizit). Berücksichtige die im Freitext beschriebene Aktivität exakt für den Leistungsumsatz.
-REGEL FÜR PROTEIN: Berechne den täglichen Proteinbedarf (targetP) AUSSCHLIESSLICH mit exakt 1,6 Gramm Protein pro Kilogramm Körpergewicht (Formel: 1.6 * Gewicht in kg). Nutze keine veralteten Richtwerte wie 2,0g/kg.
-Daten: Alter: ${aiGoalForm.age}, Geschlecht: ${aiGoalForm.gender}, Größe: ${aiGoalForm.height}cm, Gewicht: ${aiGoalForm.weight}kg, Aktivität/Sport: ${aiGoalForm.activity}, Ziel: ${aiGoalForm.goal}, Ziel-Zeitraum: ${aiGoalForm.months} Monate. Pass das tägliche Kaloriendefizit bzw. den Überschuss genau an diesen Zeitraum an (ein kürzerer Zeitraum bedeutet ein aggressiveres Defizit/Überschuss, ein längerer Zeitraum ein moderateres, nachhaltigeres Tempo).
+      const weightKg = Number(aiGoalForm.weight) || 80;
+      const exactProteinG = Math.round(weightKg * 1.6);
+      const proteinKcal = exactProteinG * 4;
+      const prompt = `Du bist ein präziser, wissenschaftlich arbeitender Ernährungsrechner. Berechne basierend auf den Nutzerdaten den täglichen Kalorienbedarf (target) sowie die optimalen Makronährstoff-Ziele für Protein (targetP), Kohlenhydrate (targetC) und Fett (targetF) in Gramm.
+
+NUTZERDATEN:
+- Alter: ${aiGoalForm.age} Jahre
+- Geschlecht: ${aiGoalForm.gender}
+- Größe: ${aiGoalForm.height} cm
+- Gewicht: ${weightKg} kg
+- Alltag & Sport: ${aiGoalForm.activity}
+- Ziel: ${aiGoalForm.goal}
+- Ziel-Zeitraum: ${aiGoalForm.months} Monate
+
+STRIKTE BERECHNUNGSREGELN:
+1. KALORIENZIEL (target): Berechne den Grundumsatz (Mifflin-St Jeor) und den realistischen Gesamtumsatz (TDEE) anhand der beschriebenen Alltags-/Sportaktivität. Passe das tägliche Kaloriendefizit bzw. den Überschuss sinnvoll und nachhaltig an das Ziel ("${aiGoalForm.goal}") und den Zeitraum (${aiGoalForm.months} Monate) an (bei "Abnehmen & Muskelaufbau gleichzeitig" ein moderates Recomp-Defizit von ca. 200–350 kcal unter TDEE).
+2. FESTE PROTEIN-REGEL (1,6g/kg nach aktueller Studienlage): Setze den täglichen Proteinbedarf (targetP) bei ALLEN Zielen AUSNAHMSLOS auf exakt 1,6 Gramm pro Kilogramm Körpergewicht! Bei ${weightKg} kg sind das exakt targetP = ${exactProteinG} g (${proteinKcal} kcal). Nutze NIEMALS höhere Werte wie 2,0g/kg.
+3. FETT & KOHLENHYDRATE (Mathematische Präzision): Setze Fett (targetF) auf einen gesunden Wert von ca. 0,8 bis 1,0 g pro kg Körpergewicht (1g Fett = 9 kcal). Berechne Kohlenhydrate (targetC, 1g = 4 kcal) exakt aus den verbleibenden Kalorien, sodass die Gleichung (targetP * 4) + (targetC * 4) + (targetF * 9) = target exakt aufgeht!
+
 Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
-{"target": int, "targetP": int, "targetC": int, "targetF": int}`;
+{"target": int, "targetP": ${exactProteinG}, "targetC": int, "targetF": int}`;
       
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { response_mime_type: "application/json" }
+          generationConfig: { response_mime_type: "application/json", temperature: 0.1 }
         })
       });
       const data = await res.json();
@@ -1934,12 +1981,16 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       
       const goals = JSON.parse(jsonMatch[0]);
       if (goals.target && goals.targetP && goals.targetC && goals.targetF) {
+        const finalTarget = Math.round(Number(goals.target));
+        const finalP = exactProteinG;
+        const finalF = Math.round(Number(goals.targetF));
+        const finalC = Math.max(0, Math.round((finalTarget - (finalP * 4) - (finalF * 9)) / 4));
         setUser(prev => ({
           ...prev,
-          target: Number(goals.target),
-          targetP: Number(goals.targetP),
-          targetC: Number(goals.targetC),
-          targetF: Number(goals.targetF)
+          target: finalTarget,
+          targetP: finalP,
+          targetC: finalC,
+          targetF: finalF
         }));
         triggerHaptic('success');
         alert("Ziele erfolgreich berechnet und übernommen!");
@@ -1969,37 +2020,66 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       }
       if (days.length === 0) throw new Error("Keine Daten in diesem Zeitraum.");
 
-      const prompt = `Du bist ein kreativer, smarter und professioneller Ernährungsberater. Analysiere die Ernährungshistorie des Nutzers im angegebenen Zeitraum im Vergleich zu seinen persönlichen Tageszielen und sportlichen Aktivitäten. Sei direkt, präzise und visuell auf den Punkt. Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt im folgenden Format:
-      {
-        "score": int (Ein Health-Score von 1 bis 100),
-        "good": ["Was war gut Punkt 1", "Was war gut Punkt 2"],
-        "bad": ["Was war schlecht Punkt 1", "Was war schlecht Punkt 2"],
-        "verdict": "Ein kurzes, knackiges, kluges Gesamtfazit",
-        "tips": ["Konkreter Verbesserungstipp 1", "Konkreter Verbesserungstipp 2"]
-      }
+      const todayStr = getLocalToday();
+      const nowTimeStr = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+      const prompt = `Du bist ein smarter, evidenzbasierter Ernährungs- & Fitness-Coach. Analysiere die Ernährungshistorie des Nutzers im angegebenen Zeitraum im Vergleich zu seinen persönlichen Tageszielen und sportlichen Aktivitäten.
 
-      Tagesziele des Nutzers: ${JSON.stringify({
-        ziel: aiGoalForm?.goal || 'Fitness',
-        zielKalorienBasis: user.target,
-        zielProteinG: user.targetP,
-        zielCarbsG: user.targetC,
-        zielFettG: user.targetF
-      })}
-      
-      Tagebuch-Daten: ${JSON.stringify(days.map(d => {
-        const foodItems = (d.items || []).filter(i => !i.isActivity);
-        const actItems = (d.items || []).filter(i => i.isActivity);
-        const consumedKcal = Math.round(foodItems.reduce((s, i) => s + (Number(i.calories) || 0), 0));
-        const burnedKcal = Math.round(actItems.reduce((s, i) => s + (Number(i.burnedCalories || i.calories) || 0), 0));
-        return {
-          date: d.date,
-          consumedKcal,
-          burnedKcalFromSport: burnedKcal,
-          effectiveTargetKcal: Number(user.target || 2000) + burnedKcal,
-          foods: foodItems.map(i => ({ name: i.name, amountG: i.amount, cal: Math.round(i.calories), p: Math.round(i.protein), c: Math.round(i.carbs), f: Math.round(i.fat) })),
-          activities: actItems.map(a => ({ name: a.name, durationMin: a.durationMinutes, burnedKcal: a.burnedCalories }))
-        };
-      }))}`;
+WICHTIGE COACHING-REGELN:
+1. AKTUELLER TAG (${todayStr}, aktuelle Uhrzeit ${nowTimeStr}): Falls das heutige Datum (${todayStr}) in den Daten enthalten ist und dort noch Kalorien/Makros fehlen, ist der Tag noch im Gange! Werte einen noch laufenden heutigen Tag NIEMALS negativ als Unterernährung oder zu großes Defizit.
+2. WISSENSCHAFTLICHER PROTEINFOKUS: 1,6g Protein pro kg Körpergewicht (hier Ziel: ${user.targetP}g) ist laut aktueller Studienlage das optimale Maximum für Muskelaufbau & Muskelerhalt. Fordere niemals mehr als dieses Ziel.
+3. SUB-MAKROS BEACHTEN: Analysiere neben Kalorien, Protein (P), Kohlenhydraten (K) und Fett (F) auch gezielt den Zuckerkonsum (Richtwert max. ${user.targetS || 50}g/Tag) sowie das Verhältnis von gesättigten zu ungesättigten Fettsäuren.
+4. KONKRET & DIREKT: Nenne in "good", "bad" und "tips" konkrete Zahlen, Durchschnittswerte oder Lebensmittel aus dem Tagebuch des Nutzers (jeweils 2–3 kurze, präzise Bullet-Points auf Deutsch, ohne generische Floskeln).
+
+Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt im folgenden Format:
+{
+  "score": int (Ein fairer Health-Score von 1 bis 100),
+  "good": ["Konkretes Lob 1 mit Bezug auf die Daten", "Konkretes Lob 2"],
+  "bad": ["Konkreter Schwachpunkt 1", "Konkreter Schwachpunkt 2"],
+  "verdict": "Ein kurzes, knackiges, kluges Gesamtfazit (1 Satz)",
+  "tips": ["Konkreter, direkt umsetzbarer Tipp 1", "Konkreter Tipp 2"]
+}
+
+Tagesziele des Nutzers: ${JSON.stringify({
+  ziel: aiGoalForm?.goal || 'Fitness',
+  gewichtKg: aiGoalForm?.weight || 80,
+  zielKalorienBasis: user.target,
+  zielProteinG: user.targetP,
+  zielKohlenhydrateG: user.targetC,
+  maxZuckerG: user.targetS || 50,
+  zielFettG: user.targetF
+})}
+
+Tagebuch-Daten: ${JSON.stringify(days.sort((a, b) => a.date.localeCompare(b.date)).map(d => {
+  const foodItems = (d.items || []).filter(i => !i.isActivity);
+  const actItems = (d.items || []).filter(i => i.isActivity);
+  const consumedKcal = Math.round(foodItems.reduce((s, i) => s + (Number(i.calories) || 0), 0));
+  const burnedKcal = Math.round(actItems.reduce((s, i) => s + (Number(i.burnedCalories || i.calories) || 0), 0));
+  const totalP = Math.round(foodItems.reduce((s, i) => s + (Number(i.protein) || 0), 0));
+  const totalC = Math.round(foodItems.reduce((s, i) => s + (Number(i.carbs) || 0), 0));
+  const totalS = Math.round(foodItems.reduce((s, i) => s + (Number(i.sugar) || 0), 0));
+  const totalF = Math.round(foodItems.reduce((s, i) => s + (Number(i.fat) || 0), 0));
+  const totalSF = Math.round(foodItems.reduce((s, i) => s + (Number(i.saturatedFat) || 0), 0));
+  const totalUF = Math.round(foodItems.reduce((s, i) => s + (Number(i.unsaturatedFat !== undefined ? i.unsaturatedFat : Math.max(0, (Number(i.fat) || 0) - (Number(i.saturatedFat) || 0))) || 0), 0));
+  return {
+    date: d.date,
+    isTodayInProgress: d.date === todayStr,
+    consumedKcal,
+    burnedKcalFromSport: burnedKcal,
+    effectiveTargetKcal: Number(user.target || 2000) + burnedKcal,
+    dayTotals: { proteinG: totalP, carbsG: totalC, sugarG: totalS, fatG: totalF, saturatedFatG: totalSF, unsaturatedFatG: totalUF },
+    foods: foodItems.map(i => ({
+      name: i.name,
+      amountG: Math.round(Number(i.amount) || 100),
+      cal: Math.round(Number(i.calories) || 0),
+      p: Math.round(Number(i.protein) || 0),
+      k: Math.round(Number(i.carbs) || 0),
+      sugar: Math.round(Number(i.sugar) || 0),
+      f: Math.round(Number(i.fat) || 0),
+      satFat: Math.round(Number(i.saturatedFat) || 0)
+    })),
+    activities: actItems.map(a => ({ name: a.name, durationMin: a.durationMinutes, burnedKcal: a.burnedCalories }))
+  };
+}))}`;
 
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
@@ -2109,7 +2189,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
   const fetchEmojiForProduct = async name => {
     if (!user.geminiApiKey) return "🍽️";
     try {
-      const prompt = `Welches einzelne, passendste Emoji beschreibt "${name}" am besten? Antworte NUR mit GENAU EINEM Emoji und absolut keinem weiteren Text.`;
+      const prompt = `Welches einzelne Emoji passt am besten zum Lebensmittel oder Gericht "${name}"? Antworte NUR mit diesem einen Emoji ohne Text.`;
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: {
@@ -2120,13 +2200,13 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             parts: [{
               text: prompt
             }]
-          }]
+          }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 15 }
         })
       });
       const data = await res.json();
-      const text = data.candidates[0].content.parts[0].text.trim();
-      // Extrakt only the first emoji found or just the first char if it's a surrogate pair
-      return [...text][0] || "🍽️";
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      return extractFirstEmoji(text, "🍽️");
     } catch (e) {
       return "🍽️";
     }
@@ -2199,15 +2279,25 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     if (!user.geminiApiKey) return alert("Bitte hinterlege deinen API Key im Profil!");
     setIsThinking(true);
     try {
-      const prompt = `Analysiere folgendes Essen (Bild und/oder Text): ${text || "das Bild"}. 
-                    WICHTIGSTE REGEL: Gib IMMER und AUSNAHMSLOS die Nährwerte für exakt 100 Gramm an!
-                    Schätze bei 'estimatedPortionWeight' das ungefähre Gesamtgewicht der gesamten Mahlzeit/Portion in Gramm (z.B. 350 für einen Teller Menemen oder Nudeln, 140 für 7 Nuggets).
-                    SMARTE EINHEIT:
-                    - NUR wenn es sich um echte, einzeln zählbare Stückgüter handelt (z.B. gekochtes Ei/Spiegelei, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Simit, Lahmacun, Burger, Dosen, Würstchen oder Proteinpulver/Whey mit 'Scoop' ca. 30g), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 20 für 1 Nugget, 55 für 1 Ei, 30 für 1 Scoop) an.
-                    - Bei gekochten Gerichten, Pfannengerichten, Tellergerichten, Schüsseln, Beilagen und gemischten Mahlzeiten (z.B. Menemen, Rührei, Shakshuka, Omelett, Pasta, Reisgerichte, Pilav, Bulgur, Bowls, Curry, Salat, Suppe, Eintopf, Müsli, Porridge, Quark, Steak, Hähnchenbrust, Auflauf, Lasagne, Gulasch) macht "Stück" KEINEN Sinn! Setze dort IMMER 'unitName': null und 'pieceWeight': null! Verwende NIEMALS "Portion", "Teller", "Pfanne", "Schale" oder "Mahlzeit" als unitName!
-                    Wähle GENAU EIN passendes Emoji aus.
-                    Gib AUSSCHLIESSLICH ein einziges, valides JSON-Objekt zurück.
-                    Format: {"name":"string", "calories":int, "protein":float, "carbs":float, "sugar":float, "fat":float, "saturatedFat":float, "estimatedPortionWeight":int, "unitName":string|null, "pieceWeight":int|null, "emoji":"string"}`;
+      const prompt = `Du bist ein präziser Ernährungswissenschaftler. Analysiere folgendes Essen (Bild und/oder Text): "${text || "siehe Foto"}".
+
+STRIKTE REGELN FÜR DIE ANALYSE:
+1. IMMER PRO 100 GRAMM (VERZEHRFERTIG): Alle Nährwerte ("calories", "protein", "carbs", "sugar", "fat", "saturatedFat", "unsaturatedFat") müssen AUSNAHMSLOS für exakt 100 Gramm des verzehrfertigen/zubereiteten Lebensmittels bzw. Gerichts angegeben werden! Bei gekochten Gerichten (z.B. Pasta, Reis, Menemen, Fleisch, Pfannengerichte) nutze die Werte im gekochten/zubereiteten Zustand inklusive realistischem Bratfett/Soße (NICHT das trockene Rohgewicht, außer der Nutzer schreibt explizit "roh" oder "trocken").
+2. SAUBERER NAME OHNE MENGENANGABE ("name"): Nenne das Gericht/Lebensmittel klar und prägnant auf Deutsch (z.B. "Magerquark", "Hähnchenbrust mit Reis", "Gekochtes Ei"). Schreibe NIEMALS Grammzahlen oder Stückzahlen (wie "250g" oder "3 Stück") in das Feld "name", da die App die Menge bereits separat anzeigt!
+3. GESAMTGEWICHT DER PORTION ("estimatedPortionWeight"):
+   - Wenn der Nutzer im Text eine konkrete Menge nennt (z.B. "250g Magerquark" -> 250, "3 Eier" -> 165, "2 Scoops Whey" -> 60), übernimm exakt dieses Gesamtgewicht in Gramm als "estimatedPortionWeight"!
+   - Wenn keine Menge genannt wurde oder ein Foto analysiert wird, schätze das realistische Gesamtgewicht der gesamten abgebildeten/üblichen Portion in Gramm (z.B. 350 für einen Teller Pasta/Menemen, 140 für 7 Nuggets).
+4. SMARTE EINHEIT ("unitName" & "pieceWeight"):
+   - NUR bei echten, einzeln zählbaren Stückgütern (z.B. Ei/Spiegelei, Nuggets, Toast/Brot-Scheibe, Banane, Apfel, Riegel, Cookie, Brötchen, Simit, Lahmacun, Burger, Dose, Würstchen oder Proteinpulver/Whey/Kreatin mit "Scoop") gib "unitName" (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und "pieceWeight" (Gewicht von genau 1 Einheit in Gramm, z.B. 55 für 1 Ei, 20 für 1 Nugget, 30 für 1 Scoop Whey) an.
+   - Bei Gerichten, Pfannengerichten, Tellergerichten, Schüsseln und Beilagen (z.B. Menemen, Rührei, Shakshuka, Omelett, Pasta, Reis, Pilav, Bulgur, Bowls, Curry, Salat, Suppe, Eintopf, Müsli, Porridge, Quark, Skyr, Steak, Hähnchenbrust, Auflauf, Lasagne, Gulasch) setze IMMER "unitName": null und "pieceWeight": null! Verwende NIEMALS "Portion", "Teller", "Pfanne", "Schale" oder "Mahlzeit" als unitName!
+5. PHYSIKALISCHE KONSISTENZ:
+   - "sugar" <= "carbs"
+   - "saturatedFat" <= "fat", und "unsaturatedFat" = ungesättigte Fettsäuren (ca. fat - saturatedFat)
+   - "calories" pro 100g muss rechnerisch zu (protein * 4 + carbs * 4 + fat * 9) passen.
+6. "emoji": Wähle GENAU EIN passendes Emoji.
+
+Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Format:
+{"name":"string", "calories":int, "protein":float, "carbs":float, "sugar":float, "fat":float, "saturatedFat":float, "unsaturatedFat":float, "estimatedPortionWeight":int, "unitName":string|null, "pieceWeight":int|null, "emoji":"string"}`;
       let contents = [{
         parts: [{
           text: prompt
@@ -2226,7 +2316,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         },
         body: JSON.stringify({
           contents,
-          generationConfig: { response_mime_type: "application/json" }
+          generationConfig: { response_mime_type: "application/json", temperature: 0.2 }
         })
       });
       const data = await res.json();
@@ -2243,13 +2333,21 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         throw new Error("JSON konnte nicht gelesen werden. Bitte versuche es noch einmal.");
       }
       
-      // Korrektur eventueller Fehlformatierungen
-      json.calories = Number(json.calories) || 0;
-      json.protein = Number(json.protein) || 0;
-      json.carbs = Number(json.carbs) || 0;
-      json.sugar = Number(json.sugar) || 0;
-      json.fat = Number(json.fat) || 0;
-      json.saturatedFat = Number(json.saturatedFat) || 0;
+      // Falls die KI trotz Regel eine führende Grammangabe in den Namen geschrieben hat (z.B. "250g Magerquark"), bereinigen
+      if (json.name && typeof json.name === 'string') {
+        json.name = json.name.replace(/^\s*\d+([.,]\d+)?\s*(g|gramm|ml|kg)\s+(?=[^\d])/i, '').trim() || json.name.trim();
+      }
+
+      // Korrektur & Plausibilitätsprüfung eventueller Fehlformatierungen
+      json.calories = Math.max(0, Math.round(Number(json.calories) || 0));
+      json.protein = Math.max(0, Math.round((Number(json.protein) || 0) * 10) / 10);
+      json.carbs = Math.max(0, Math.round((Number(json.carbs) || 0) * 10) / 10);
+      json.sugar = Math.min(json.carbs, Math.max(0, Math.round((Number(json.sugar) || 0) * 10) / 10));
+      json.fat = Math.max(0, Math.round((Number(json.fat) || 0) * 10) / 10);
+      json.saturatedFat = Math.min(json.fat, Math.max(0, Math.round((Number(json.saturatedFat) || 0) * 10) / 10));
+      json.unsaturatedFat = json.unsaturatedFat !== undefined
+        ? Math.min(Math.max(0, Math.round((json.fat - json.saturatedFat) * 10) / 10), Math.max(0, Math.round((Number(json.unsaturatedFat) || 0) * 10) / 10))
+        : Math.max(0, Math.round((json.fat - json.saturatedFat) * 10) / 10);
       if (json.pieceWeight) json.pieceWeight = Number(json.pieceWeight);
 
       // Prüfe mit getSmartFoodUnit, ob die Einheit für dieses Essen wirklich Sinn ergibt
@@ -2257,10 +2355,8 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       json.unitName = validatedUnit ? validatedUnit.unitName : null;
       json.pieceWeight = validatedUnit ? validatedUnit.pieceWeight : null;
 
-      // Sicherstellen, dass nur EIN Emoji genommen wird
-      if (json.emoji) {
-        json.emoji = [...json.emoji.trim()][0];
-      }
+      // Sicherstellen, dass genau EIN vollständiges Emoji genommen wird
+      json.emoji = extractFirstEmoji(json.emoji, '🍽️');
       setSelectedFood({
         ...json,
         id: generateId(),
@@ -3708,7 +3804,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.1 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.2 Live</span>
     </div>
     <button 
       type="button" 
@@ -3894,7 +3990,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=4.1').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=4.2').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
