@@ -17,7 +17,44 @@
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+
+    <style>
+        body { -webkit-tap-highlight-color: transparent; background-color: #070b14; color: #f8fafc; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
+        .glass-card { background: rgba(21, 30, 45, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes initProgress {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(60%); }
+            100% { transform: translateX(220%); }
+        }
+        @keyframes focusReticle {
+            0% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.3; }
+            20% { transform: translate(-50%, -50%) scale(0.95); opacity: 1; }
+            40% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
+            60% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
+            85% { transform: translate(-50%, -50%) scale(1.0); opacity: 0.9; }
+            100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0; }
+        }
+        .animate-focus-reticle { animation: focusReticle 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        #qr-reader { border: none !important; width: 100% !important; height: 100% !important; background: black !important; }
+        #qr-reader video { border-radius: 1.5rem; object-fit: cover !important; width: 100% !important; height: 100% !important; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-slate-950">
+    <div id="root">
+        <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background-color:#070b14;">
+            <div style="width:42px;height:42px;border-radius:50%;border:3.5px solid rgba(139,92,246,0.2);border-top-color:#a78bfa;animation:spin 0.85s linear infinite;margin-bottom:18px;box-shadow:0 0 20px rgba(139,92,246,0.25);"></div>
+            <div style="font-size:18px;font-weight:900;letter-spacing:-0.03em;color:#ffffff;font-style:italic;margin-bottom:14px;">Kalorien-Zähler</div>
+            <div style="width:180px;height:5px;background:rgba(30,41,59,0.9);border-radius:999px;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,0.05);">
+                <div style="height:100%;width:45%;background:linear-gradient(90deg,#7c3aed,#e879f9,#a78bfa);border-radius:999px;animation:initProgress 1.15s ease-in-out infinite;box-shadow:0 0 10px rgba(168,85,247,0.8);"></div>
+            </div>
+            <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.18em;color:#64748b;margin-top:12px;">Lade App...</div>
+        </div>
+    </div>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -64,28 +101,6 @@
             }
         }
     </script>
-
-    <style>
-        body { -webkit-tap-highlight-color: transparent; background-color: #070b14; color: #f8fafc; font-family: 'Inter', sans-serif; }
-        .glass-card { background: rgba(21, 30, 45, 0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .spinner { animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        @keyframes focusReticle {
-            0% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.3; }
-            20% { transform: translate(-50%, -50%) scale(0.95); opacity: 1; }
-            40% { transform: translate(-50%, -50%) scale(1.05); opacity: 1; }
-            60% { transform: translate(-50%, -50%) scale(1.0); opacity: 1; }
-            85% { transform: translate(-50%, -50%) scale(1.0); opacity: 0.9; }
-            100% { transform: translate(-50%, -50%) scale(1.0); opacity: 0; }
-        }
-        .animate-focus-reticle { animation: focusReticle 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        #qr-reader { border: none !important; width: 100% !important; height: 100% !important; background: black !important; }
-        #qr-reader video { border-radius: 1.5rem; object-fit: cover !important; width: 100% !important; height: 100% !important; }
-        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-    </style>
-</head>
-<body class="bg-slate-950">
-    <div id="root"></div>
 
     <script>
 
@@ -1126,66 +1141,60 @@ function App() {
   const [emojiPickerConfig, setEmojiPickerConfig] = useState(null);
   const [customEmojiInput, setCustomEmojiInput] = useState('');
   const [isAddingIngredient, setIsAddingIngredient] = useState(false);
-  const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Prüfe auf GitHub-Update...' });
+  const CURRENT_APP_VERSION = 'v4.0';
+  const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Neues Update verfügbar...' });
   const lastUpdateCheckRef = useRef(0);
 
-  const runVisualUpdateCheck = useCallback(async (forceManual = false) => {
+  const runVisualUpdateCheck = useCallback(async () => {
     const now = Date.now();
-    if (!forceManual && now - lastUpdateCheckRef.current < 5 * 60 * 1000) return;
+    if (now - lastUpdateCheckRef.current < 5 * 60 * 1000) return;
     lastUpdateCheckRef.current = now;
 
-    setUpdateBanner({ visible: true, progress: 18, text: 'Prüfe auf GitHub-Update...' });
-    const t1 = setTimeout(() => setUpdateBanner(p => p.visible ? { ...p, progress: 55 } : p), 220);
-    const t2 = setTimeout(() => setUpdateBanner(p => p.visible ? { ...p, progress: 82 } : p), 500);
+    // 1. Nur einmalig anzeigen, wenn die App gerade auf eine neue Version aktualisiert wurde
+    const prevVersion = localStorage.getItem('kTrackAppVersion');
+    if (prevVersion && prevVersion !== CURRENT_APP_VERSION) {
+      localStorage.setItem('kTrackAppVersion', CURRENT_APP_VERSION);
+      setUpdateBanner({ visible: true, progress: 100, text: `Auf Version ${CURRENT_APP_VERSION} aktualisiert ✓` });
+      setTimeout(() => {
+        setUpdateBanner(p => ({ ...p, visible: false }));
+      }, 2200);
+    } else if (!prevVersion) {
+      localStorage.setItem('kTrackAppVersion', CURRENT_APP_VERSION);
+    }
 
-    let foundNew = false;
+    // 2. Still im Hintergrund prüfen – Banner NUR zeigen, wenn wirklich ein neues Update auf GitHub gefunden wird!
     try {
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.getRegistration();
         if (reg) {
           await reg.update().catch(() => {});
-          if (reg.waiting) {
-            foundNew = true;
+          if (reg.waiting && navigator.serviceWorker.controller) {
             setUpdateBanner({ visible: true, progress: 100, text: 'Neues Update wird installiert...' });
             reg.waiting.postMessage('SKIP_WAITING');
             return;
           }
-          if (reg.installing) {
-            foundNew = true;
-            setUpdateBanner({ visible: true, progress: 92, text: 'Lade neues Update von GitHub...' });
+          if (reg.installing && navigator.serviceWorker.controller) {
+            setUpdateBanner({ visible: true, progress: 85, text: 'Lade neues Update von GitHub...' });
             const sw = reg.installing;
             sw.addEventListener('statechange', () => {
               if (sw.state === 'installed' && reg.waiting) {
                 setUpdateBanner({ visible: true, progress: 100, text: 'Update bereit – starte neu...' });
                 reg.waiting.postMessage('SKIP_WAITING');
-              } else if (sw.state === 'activated' || sw.state === 'redundant') {
-                setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.9 ist aktuell ✓' });
-                setTimeout(() => setUpdateBanner(p => ({ ...p, visible: false })), 600);
+              } else if (sw.state === 'redundant') {
+                setUpdateBanner(p => ({ ...p, visible: false }));
               }
             });
-            return;
           }
         }
       }
     } catch (e) {}
-
-    setTimeout(() => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      if (!foundNew) {
-        setUpdateBanner({ visible: true, progress: 100, text: 'Version v3.9 ist aktuell ✓' });
-        setTimeout(() => {
-          setUpdateBanner(p => ({ ...p, visible: false }));
-        }, 650);
-      }
-    }, 800);
   }, []);
 
   useEffect(() => {
-    runVisualUpdateCheck(false);
+    runVisualUpdateCheck();
     const onVisUpdate = () => {
       if (document.visibilityState === 'visible') {
-        runVisualUpdateCheck(false);
+        runVisualUpdateCheck();
       }
     };
     document.addEventListener('visibilitychange', onVisUpdate);
@@ -3671,7 +3680,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.9 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.0 Live</span>
     </div>
     <button 
       type="button" 
@@ -3857,7 +3866,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.9').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=4.0').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
