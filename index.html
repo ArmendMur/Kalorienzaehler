@@ -2,7 +2,7 @@
 <html lang="de" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://world.openfoodfacts.org https://generativelanguage.googleapis.com; img-src 'self' data: blob: https:; media-src 'self' blob:; worker-src 'self' blob:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://world.openfoodfacts.org https://generativelanguage.googleapis.com https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://unpkg.com https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' blob:; worker-src 'self' blob:;">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta http-equiv="X-Content-Type-Options" content="nosniff">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -132,58 +132,171 @@ const getItemDisplay = (item, isLarge = false) => {
   return html`<div className=${`flex items-center justify-center w-full h-full ${isLarge ? 'text-3xl' : 'text-xl'}`}>🍽️</div>`;
 };
 
-const getSmartFoodUnit = (food) => {
-  if (!food) return null;
-  if (food.unitName && food.pieceWeight) {
-    const uName = String(food.unitName).trim();
-    if (uName.toLowerCase() !== 'portion' || food.isRecipe) {
-      return { unitName: uName, pieceWeight: Number(food.pieceWeight) };
-    }
+const isDishOrBulkFood = (rawName) => {
+  if (!rawName) return false;
+  const name = String(rawName).toLowerCase().trim();
+
+  // Explizite Gerichte, Pfannengerichte, Schüsselgerichte & Beilagen, bei denen "Stück" keinen Sinn ergibt
+  if (/\b(menemen|shakshuka|rührei|ruehrei|omelett|omelette|sucuklu yumurta|mıhlama|mihlama|kuymak|pfanne|auflauf|gratin|suppe|eintopf|brühe|bruehe|çorba|corba|curry|bowl|salat|kisir|kısır|pasta|nudeln|spaghetti|penne|tagliatelle|maccheroni|gnocchi|lasagne|bolognese|carbonara|manti|mantı|reis|pilav|risotto|paella|bulgur|couscous|quinoa|gulasch|geschnetzeltes|ragout|sote|tavuk sote|et sote|kuru fasulye|nohut|mercimek|chili|linsen|kichererbsen|gemüse|gemuese|ratatouille|pommes|wedges|bratkartoffeln|kartoffelbrei|kartoffelpüree|püree|pueree|stampf|müsli|muesli|porridge|oatmeal|haferflocken|overnight oats|grießbrei|griessbrei|milchreis|pudding|quark|skyr|hüttenkäse|huettenkaese|frischkäse|frischkaese|iskender|dönerbox|doenerbox|dönerteller|doenerteller|dönerfleisch|doenerfleisch|kebabteller|karnıyarık|karniyarik|imam bayildi|güveç|guevec|steak|filet|hähnchenbrust|haehnchenbrust|putenbrust|hackfleisch|gyros|lachs|lachsfilet|thunfisch|forelle|kabeljau|spinat|brokkoli|blumenkohl|rosenkohl|rotkohl|sauerkraut|champignons|pilzpfanne|tofu|tiramisu|obstsalat|cacik|cacık|tzatziki|hummus|humus|guacamole|ezme|haydari|soße|sauce|beilage|teller|gericht|mahlzeit|schale|schüssel|schuessel)\b/i.test(name)) {
+    return true;
   }
-  const name = (food.name || '').toLowerCase();
-  
-  if (/\b(whey|proteinpulver|protein powder|casein|clear whey|iso whey|protein shake)\b/i.test(name) || /whey/i.test(name) || /proteinpulver/i.test(name)) {
-    const weight = (food.pieceWeight && Number(food.pieceWeight) > 0)
+
+  // Zusammengesetzte Mahlzeiten ("X mit Y", z.B. "Hähnchen mit Reis", "Haferflocken mit Banane") sind Gerichte -> Gramm,
+  // außer es beginnt explizit mit einem zählbaren Träger (z.B. "Brötchen mit...", "Toast mit...", "Burger mit...")
+  if (/\b(mit|in\s+soße|in\s+sauce)\b/i.test(name)) {
+    const startsWithCountableCarrier = /^(brötchen|broetchen|semmel|schrippe|toast|toastbrot|brotscheibe|scheibe\s+brot|burger|cheeseburger|hamburger|döner|doener|dürüm|dueruem|wrap|tortilla|bagel|croissant|laugenbrötchen|brezel|pfannkuchen|pancake|crêpe|crepe|waffel|knäckebrot|reiswaffel)\b/i.test(name);
+    if (!startsWithCountableCarrier) return true;
+  }
+
+  return false;
+};
+
+const getKnownCountableUnit = (rawName, food = null) => {
+  if (!rawName) return null;
+  const name = String(rawName).toLowerCase().trim();
+
+  if (/\b(whey|proteinpulver|protein powder|casein|clear whey|iso whey|protein shake|kreatin|creatin|creatine|pre[\s-]?workout|bcaa|eaa|kollagen|collagen|chunky flavour|geschmackspulver)\b/i.test(name) || /whey|proteinpulver/i.test(name)) {
+    const defaultW = /\b(kreatin|creatin|creatine|chunky flavour|geschmackspulver)\b/i.test(name) ? 5 : 30;
+    const weight = (food?.pieceWeight && Number(food.pieceWeight) > 0 && Number(food.pieceWeight) <= 60)
       ? Number(food.pieceWeight)
-      : (food.amount && food.amount > 0 && food.amount < 100 ? Number(food.amount) : 30);
+      : (food?.amount && food.amount > 0 && food.amount <= 60 ? Number(food.amount) : defaultW);
     return { unitName: 'Scoop', pieceWeight: weight };
   }
-  if (/\b(ei|eier|rührei|spiegelei|gekochtes ei|gekochte eier)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 55 };
-  if (/\b(nugget|nuggets)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 20 };
+  if (/\b(ei|eier|spiegelei|spiegeleier|gekochtes ei|gekochte eier|hartgekochtes ei|weichgekochtes ei|pochiertes ei)\b/i.test(name) && !/\b(eiersalat|eierpfannkuchen|eiernudeln|eierreis)\b/i.test(name)) {
+    return { unitName: 'Stück', pieceWeight: 55 };
+  }
+  if (/\b(nugget|nuggets|chicken\s*nuggets?)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 20 };
+  if (/\b(fischstäbchen|fischstaebchen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 30 };
   if (/\b(banane|bananen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
-  if (/\b(apfel|äpfel)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 150 };
+  if (/\b(apfel|äpfel|aepfel)\b/i.test(name) && !/apfelmus|apfelsaft|apfelstrudel|apfelkuchen/i.test(name)) return { unitName: 'Stück', pieceWeight: 150 };
   if (/\b(birne|birnen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 160 };
-  if (/\b(orange|orangen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 180 };
-  if (/\b(toast|toastbrot)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 30 };
-  if (/\b(brot|brotscheibe|graubrot|vollkornbrot)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 45 };
-  if (/\b(brötchen|semmel|schrippe)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
-  if (/\b(riegel|proteinriegel|müsliriegel|corny)\b/i.test(name)) return { unitName: 'Riegel', pieceWeight: 45 };
-  if (/\b(keks|kekse|cookie|cookies)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 25 };
-  if (/\b(burger|cheeseburger|hamburger)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 200 };
-  if (/\b(dose|red bull|monster|cola)\b/i.test(name) && !/100/i.test(name)) return { unitName: 'Dose', pieceWeight: 330 };
-  if (/\b(flasche|wasser)\b/i.test(name) && !/100/i.test(name)) return { unitName: 'Flasche', pieceWeight: 500 };
-  if (/\b(avocado)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 160 };
+  if (/\b(orange|orangen)\b/i.test(name) && !/orangensaft/i.test(name)) return { unitName: 'Stück', pieceWeight: 180 };
+  if (/\b(mandarine|mandarinen|clementine|clementinen|kiwi|kiwis|pfirsich|nektarine)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 85 };
+  if (/\b(dattel|datteln|feige|feigen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 20 };
+  if (/\b(avocado|avocados)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 160 };
+  if (/\b(toast|toastbrot|sandwichscheibe)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 30 };
+  if (/\b(brotscheibe|scheibe\s+brot|graubrot|vollkornbrot|eiweißbrot|eiweissbrot)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 45 };
+  if (/\b(scheibe\s+käse|käsescheibe|scheibe\s+schinken|scheibe\s+wurst|scheibe\s+salami)\b/i.test(name)) return { unitName: 'Scheibe', pieceWeight: 25 };
+  if (/\b(knäckebrot|knaeckebrot|reiswaffel|reiswaffeln|maiswaffel|maiswaffeln|zwieback)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 10 };
+  if (/\b(brötchen|broetchen|semmel|schrippe|laugenbrötchen|laugenstange|brezel|laugenbrezel|croissant|bagel|poğaça|pogaca|açma|acma)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 65 };
+  if (/\b(simit)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 110 };
+  if (/\b(muffin|donut|berliner|krapfen|pfannkuchen|pancake|pancakes|waffel|waffeln|crêpe|crepe)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 75 };
+  if (/\b(riegel|proteinriegel|müsliriegel|muesliriegel|schokoriegel|corny|duplo|hanuta|knoppers|kinderriegel|kinder\s+bueno|kinder\s+pingui|milchschnitte|snickers|mars|twix|bounty|kitkat|balisto)\b/i.test(name)) return { unitName: 'Riegel', pieceWeight: 45 };
+  if (/\b(keks|kekse|cookie|cookies|oreo|spekulatius|lebkuchen|baklava|praline|ferrero|raffaello)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 25 };
+  if (/\b(burger|cheeseburger|hamburger|chickenburger)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 200 };
+  if (/\b(döner|doener|dürüm|dueruem)\b/i.test(name) && !/teller|box|fleisch/i.test(name)) return { unitName: 'Stück', pieceWeight: 350 };
+  if (/\b(lahmacun)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 150 };
+  if (/\b(sigara\s*börek|sigara\s*boerek|frühlingsrolle|fruehlingsrolle|sommerrolle|sarma|yaprak\s*sarma|dolma|falafel|cevapcici|köfte|koefte|içli\s*köfte|icli\s*koefte|gyoza|dumpling|maultasche|maultaschen)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 35 };
+  if (/\b(frikadelle|frikadellen|bulette|buletten|fleischpflanzerl)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 75 };
+  if (/\b(wiener|würstchen|wuerstchen|bratwurst|bockwurst|weißwurst|weisswurst|mettwurst|bifi)\b/i.test(name) && !/gulasch|topf|pfanne/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
+  if (/\b(pizzastück|stück\s+pizza)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
+  if (/\b(sushi|maki|nigiri)\b/i.test(name) && !/bowl/i.test(name)) return { unitName: 'Stück', pieceWeight: 25 };
+  if (/\b(dose|red bull|monster\s*energy|cola\s*dose)\b/i.test(name) && !/100/i.test(name)) return { unitName: 'Dose', pieceWeight: 330 };
+  if (/\b(flasche)\b/i.test(name) && !/100/i.test(name)) return { unitName: 'Flasche', pieceWeight: 500 };
   if (/\b(becher|joghurtbecher)\b/i.test(name)) return { unitName: 'Becher', pieceWeight: 150 };
-  if (/\b(pizzastück|pizza)\b/i.test(name) && !/ganz/i.test(name)) return { unitName: 'Stück', pieceWeight: 120 };
-  if (/\b(wiener|würstchen|bratwurst)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
 
   return null;
 };
 
+const getSmartFoodUnit = (food) => {
+  if (!food) return null;
+
+  // 1. Eigene Rezepte behalten immer ihre Rezept-/Portions-Einheit
+  if (food.isRecipe || (food.unitName && String(food.unitName).toLowerCase() === 'rezept')) {
+    const pWeight = Number(food.pieceWeight || food.estimatedPortionWeight || food.totalWeight || 100);
+    return { unitName: food.unitName || 'Portion', pieceWeight: pWeight > 0 ? pWeight : 100 };
+  }
+
+  const name = (food.name || '').toLowerCase().trim();
+
+  // 2. Gerichte / Pfannen / Bowls / Beilagen (z.B. Menemen, Rührei, Pasta, Reis, Auflauf, Suppe) sind IMMER in Gramm
+  if (isDishOrBulkFood(name)) {
+    return null;
+  }
+
+  // 3. Bekannte zählbare Lebensmittel prüfen
+  const knownUnit = getKnownCountableUnit(name, food);
+
+  // 4. Falls das Item bereits eine gespeicherte Einheit hat (z.B. von KI oder Barcode):
+  if (food.unitName && food.pieceWeight && Number(food.pieceWeight) > 0) {
+    const uName = String(food.unitName).trim();
+    const uLower = uName.toLowerCase();
+
+    // Generische Portionsbegriffe niemals als Stück-Einheit akzeptieren
+    if (/^(portion|portionen|teller|schale|schüssel|schuessel|pfanne|mahlzeit|gericht|gramm|g|ml)$/i.test(uLower)) {
+      return knownUnit;
+    }
+
+    // Spezifische Einheiten wie Scoop, Scheibe, Riegel, Dose, Becher, Flasche, Kapsel erlauben
+    if (/^(scoop|scoops|messlöffel|messloeffel|scheibe|scheiben|riegel|dose|flasche|becher|tasse|glas|kugel|kapsel|tablette)$/i.test(uLower)) {
+      const normalizedName = /^(scoop|scoops|messlöffel|messloeffel)$/i.test(uLower) ? 'Scoop'
+        : /^(scheibe|scheiben)$/i.test(uLower) ? 'Scheibe'
+        : uName;
+      return { unitName: normalizedName, pieceWeight: Number(food.pieceWeight) };
+    }
+
+    // Bei "Stück" nur dann erlauben, wenn es wirklich ein bekanntes Stückgut ist
+    // (verhindert, dass Gerichte wie Menemen fälschlicherweise als "1 Stück" angezeigt werden)
+    if (/^(stück|stueck|stk\.?)$/i.test(uLower)) {
+      if (knownUnit) {
+        return { unitName: knownUnit.unitName, pieceWeight: Number(food.pieceWeight) || knownUnit.pieceWeight };
+      }
+      return null;
+    }
+  }
+
+  return knownUnit;
+};
+
+const formatFoodAmountDisplay = (item) => {
+  if (!item) return '100g';
+  const grams = Math.round(Number(item.amount || (item.amountFactor ? item.amountFactor * 100 : (item.lastAmount || 100))));
+  const unitInfo = getSmartFoodUnit(item);
+
+  // Wenn für dieses Gericht keine Stück-Einheit Sinn ergibt (z.B. Menemen), zeige IMMER nur Gramm an
+  if (!unitInfo) {
+    return `${grams}g`;
+  }
+
+  // Falls der Eintrag explizit im Gramm-Modus gespeichert wurde (z.B. "150g"), respektiere das im Tagebuch
+  if (item.amountDisplay && /^\d+([.,]\d+)?\s*g$/i.test(String(item.amountDisplay).trim())) {
+    return `${grams}g`;
+  }
+
+  if (item.amountDisplay && !/portion|teller|schale|mahlzeit/i.test(item.amountDisplay)) {
+    return item.amountDisplay;
+  }
+
+  const rawCount = grams / unitInfo.pieceWeight;
+  const pieceCount = Math.round(rawCount * 10) / 10;
+  if (pieceCount <= 0) return `${grams}g`;
+  const countDisplay = Number.isInteger(pieceCount) ? pieceCount : pieceCount.toString().replace('.', ',');
+  let unitLabel = unitInfo.unitName;
+  if (unitLabel.toLowerCase() === 'scoop' && pieceCount > 1) unitLabel = 'Scoops';
+  return `${countDisplay} ${unitLabel} (${grams}g)`;
+};
+
 const resizeImage = file => {
   return new Promise(resolve => {
+    if (!file) return resolve(null);
     const reader = new FileReader();
+    reader.onerror = () => resolve(null);
     reader.onload = e => {
       const img = new Image();
+      img.onerror = () => resolve(null);
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const scale = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.6));
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 800;
+          const scale = img.width > MAX_WIDTH ? (MAX_WIDTH / img.width) : 1;
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        } catch (err) {
+          resolve(null);
+        }
       };
       img.src = e.target.result;
     };
@@ -378,11 +491,13 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
   const startY = useRef(0);
   const isHorizontal = useRef(null);
   const currentTranslate = useRef(0);
+  const hapticTriggered = useRef(false);
 
   const handleTouchStart = (e) => {
     startX.current = e.touches[0].clientX;
     startY.current = e.touches[0].clientY;
     isHorizontal.current = null;
+    hapticTriggered.current = false;
     setIsDragging(false);
   };
 
@@ -404,9 +519,9 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
         const newX = diffX < -110 ? -110 + (diffX + 110) * 0.4 : diffX;
         setTranslateX(newX);
         currentTranslate.current = newX;
-        if (newX < -130 && !window._hapticTriggered) {
+        if (newX < -130 && !hapticTriggered.current) {
           triggerHaptic('medium');
-          window._hapticTriggered = true;
+          hapticTriggered.current = true;
         }
       } else {
         setTranslateX(diffX * 0.15);
@@ -416,7 +531,7 @@ const SwipeableItem = ({ children, onDelete, onSelect, className = "" }) => {
   };
 
   const handleTouchEnd = () => {
-    window._hapticTriggered = false;
+    hapticTriggered.current = false;
     setIsDragging(false);
     if (currentTranslate.current < -140) {
       triggerDelete();
@@ -502,7 +617,7 @@ const SwipeableLogItem = ({ item, onSelect, onSelectActivity, onDelete }) => htm
           <div className=${`text-[10px] font-black uppercase truncate ${item.isActivity ? 'text-amber-400' : 'text-slate-500'}`}>
             ${item.isActivity 
               ? `${item.durationMinutes ? `${item.durationMinutes} Min | ` : ''}⚡ -${item.burnedCalories || item.calories || 0} kcal verbrannt`
-              : `${item.amountDisplay || `${item.amount || 100}g`} | ${Math.round(item.calories)} kcal`}
+              : `${formatFoodAmountDisplay(item)} | ${Math.round(item.calories)} kcal`}
           </div>
         </div>
       </div>
@@ -887,14 +1002,22 @@ function App() {
   const [focusPoint, setFocusPoint] = useState(null);
   const focusTimeoutRef = useRef(null);
 
+  const safeSetLocalStorage = (key, val) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(val));
+    } catch (e) {
+      console.warn(`LocalStorage Quota Warnung (${key}):`, e);
+    }
+  };
+
   useEffect(() => {
-    localStorage.setItem('kTrackUser', JSON.stringify(user));
+    safeSetLocalStorage('kTrackUser', user);
   }, [user]);
   useEffect(() => {
-    localStorage.setItem('kTrackAiGoalForm', JSON.stringify(aiGoalForm));
+    safeSetLocalStorage('kTrackAiGoalForm', aiGoalForm);
   }, [aiGoalForm]);
   useEffect(() => {
-    localStorage.setItem('kTrackRecipes', JSON.stringify(recipes));
+    safeSetLocalStorage('kTrackRecipes', recipes);
   }, [recipes]);
   useEffect(() => {
     const cleanLogs = {};
@@ -903,13 +1026,13 @@ function App() {
         cleanLogs[key] = allLogs[key];
       }
     }
-    localStorage.setItem('kTrackAllLogs', JSON.stringify(cleanLogs));
+    safeSetLocalStorage('kTrackAllLogs', cleanLogs);
   }, [allLogs]);
   useEffect(() => {
-    localStorage.setItem('kTrackHistory', JSON.stringify(itemHistory));
+    safeSetLocalStorage('kTrackHistory', itemHistory);
   }, [itemHistory]);
   useEffect(() => {
-    localStorage.setItem('kTrackActivityHistory', JSON.stringify(activityHistory));
+    safeSetLocalStorage('kTrackActivityHistory', activityHistory);
   }, [activityHistory]);
 
   const [hiddenSavedFoods, setHiddenSavedFoods] = useState(() => {
@@ -922,7 +1045,7 @@ function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('kTrackHiddenFoods', JSON.stringify(hiddenSavedFoods));
+    safeSetLocalStorage('kTrackHiddenFoods', hiddenSavedFoods);
   }, [hiddenSavedFoods]);
 
   const deleteSavedFood = (foodName) => {
@@ -960,10 +1083,16 @@ function App() {
   useEffect(() => {
     if (selectedFood) {
       const u = getSmartFoodUnit(selectedFood);
-      setEntryUnitMode(u ? 'unit' : 'gram');
+      if (!u) {
+        setEntryUnitMode('gram');
+      } else if (selectedFood.preferredUnitMode === 'gram' || selectedFood.preferredUnitMode === 'unit') {
+        setEntryUnitMode(selectedFood.preferredUnitMode);
+      } else {
+        setEntryUnitMode('unit');
+      }
       setUnitStepSize(1);
     }
-  }, [selectedFood?.name, selectedFood?.instanceId, selectedFood?.id]);
+  }, [selectedFood?.name, selectedFood?.instanceId, selectedFood?.id, selectedFood?.preferredUnitMode]);
 
   const triggerSuccessToast = (msg = 'Gespeichert!') => {
     setSuccessMessage(msg);
@@ -1129,22 +1258,42 @@ function App() {
     setShowRecipeModal(true);
   };
 
-  const addIngredientToDraft = () => {
-    if (!draftSelectedFood) return alert("Bitte wähle eine Zutat aus.");
+  const addIngredientToDraft = (customFood = null) => {
+    const isExplicitFood = customFood && typeof customFood === 'object' && !customFood.nativeEvent && !customFood._reactName;
+    let targetFood = isExplicitFood ? customFood : draftSelectedFood;
+
+    if (!targetFood && draftIngSearch.trim()) {
+      const q = draftIngSearch.trim().toLowerCase();
+      const matched = allSavedFoods.find(f => f?.name?.toLowerCase() === q) ||
+                      allSavedFoods.find(f => f?.name?.toLowerCase().includes(q));
+      targetFood = matched || {
+        name: draftIngSearch.trim(),
+        emoji: '🍽️',
+        calories: 100,
+        protein: 0,
+        carbs: 0,
+        sugar: 0,
+        fat: 0,
+        saturatedFat: 0,
+        unsaturatedFat: 0
+      };
+    }
+
+    if (!targetFood) return alert("Bitte wähle eine Zutat aus.");
     const g = Number(draftIngGrams) || 0;
     if (g <= 0) return alert("Bitte eine gültige Grammzahl eingeben.");
     const ing = {
       id: generateId(),
-      name: draftSelectedFood.name,
-      emoji: draftSelectedFood.emoji || '🍽️',
+      name: targetFood.name,
+      emoji: targetFood.emoji || '🍽️',
       grams: g,
-      baseCalories: Number(draftSelectedFood.baseCalories ?? draftSelectedFood.calories ?? 0),
-      baseProtein: Number(draftSelectedFood.baseProtein ?? draftSelectedFood.protein ?? 0),
-      baseCarbs: Number(draftSelectedFood.baseCarbs ?? draftSelectedFood.carbs ?? 0),
-      baseSugar: Number(draftSelectedFood.baseSugar ?? draftSelectedFood.sugar ?? 0),
-      baseFat: Number(draftSelectedFood.baseFat ?? draftSelectedFood.fat ?? 0),
-      baseSaturatedFat: Number(draftSelectedFood.baseSaturatedFat ?? draftSelectedFood.saturatedFat ?? 0),
-      baseUnsaturatedFat: Number(draftSelectedFood.baseUnsaturatedFat ?? draftSelectedFood.unsaturatedFat ?? 0)
+      baseCalories: Number(targetFood.baseCalories ?? targetFood.calories ?? 0),
+      baseProtein: Number(targetFood.baseProtein ?? targetFood.protein ?? 0),
+      baseCarbs: Number(targetFood.baseCarbs ?? targetFood.carbs ?? 0),
+      baseSugar: Number(targetFood.baseSugar ?? targetFood.sugar ?? 0),
+      baseFat: Number(targetFood.baseFat ?? targetFood.fat ?? 0),
+      baseSaturatedFat: Number(targetFood.baseSaturatedFat ?? targetFood.saturatedFat ?? 0),
+      baseUnsaturatedFat: Number(targetFood.baseUnsaturatedFat ?? targetFood.unsaturatedFat ?? 0)
     };
     setRecipeDraft(prev => ({
       ...prev,
@@ -1226,14 +1375,14 @@ function App() {
   };
 
   useEffect(() => {
-    const isModalOpen = !!(selectedFood || showAiModal || showDetails || isScanning);
+    const isModalOpen = !!(selectedFood || showAiModal || showDetails || isScanning || showRecipeModal || showActivityModal || showCalendarModal || showAiCoach);
     document.body.style.overflow = isModalOpen ? 'hidden' : '';
     document.body.style.touchAction = isModalOpen ? 'none' : '';
     return () => {
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
     };
-  }, [selectedFood, showAiModal, showDetails, isScanning]);
+  }, [selectedFood, showAiModal, showDetails, isScanning, showRecipeModal, showActivityModal, showCalendarModal, showAiCoach]);
 
   // Kamera sicher ausschalten, wenn die Komponente entladen wird oder isScanning false ist
   useEffect(() => {
@@ -1600,10 +1749,13 @@ Daten: Alter: ${aiGoalForm.age}, Geschlecht: ${aiGoalForm.gender}, Größe: ${ai
 Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
 {"target": int, "targetP": int, "targetC": int, "targetF": int}`;
       
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
@@ -1649,7 +1801,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       }
       if (days.length === 0) throw new Error("Keine Daten in diesem Zeitraum.");
 
-      const prompt = `Du bist ein kreativer, smarter und professioneller Ernährungsberater. Analysiere die Ernährungshistorie des Nutzers im angegebenen Zeitraum. Sei direkt, präzise und visuell auf den Punkt. Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt im folgenden Format:
+      const prompt = `Du bist ein kreativer, smarter und professioneller Ernährungsberater. Analysiere die Ernährungshistorie des Nutzers im angegebenen Zeitraum im Vergleich zu seinen persönlichen Tageszielen und sportlichen Aktivitäten. Sei direkt, präzise und visuell auf den Punkt. Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt im folgenden Format:
       {
         "score": int (Ein Health-Score von 1 bis 100),
         "good": ["Was war gut Punkt 1", "Was war gut Punkt 2"],
@@ -1657,16 +1809,37 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         "verdict": "Ein kurzes, knackiges, kluges Gesamtfazit",
         "tips": ["Konkreter Verbesserungstipp 1", "Konkreter Verbesserungstipp 2"]
       }
-      
-      Daten: ${JSON.stringify(days.map(d => ({
-        date: d.date,
-        items: d.items.map(i => ({ name: i.name, cal: i.calories, p: i.protein, c: i.carbs, f: i.fat }))
-      })))}`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
+      Tagesziele des Nutzers: ${JSON.stringify({
+        ziel: aiGoalForm?.goal || 'Fitness',
+        zielKalorienBasis: user.target,
+        zielProteinG: user.targetP,
+        zielCarbsG: user.targetC,
+        zielFettG: user.targetF
+      })}
+      
+      Tagebuch-Daten: ${JSON.stringify(days.map(d => {
+        const foodItems = (d.items || []).filter(i => !i.isActivity);
+        const actItems = (d.items || []).filter(i => i.isActivity);
+        const consumedKcal = Math.round(foodItems.reduce((s, i) => s + (Number(i.calories) || 0), 0));
+        const burnedKcal = Math.round(actItems.reduce((s, i) => s + (Number(i.burnedCalories || i.calories) || 0), 0));
+        return {
+          date: d.date,
+          consumedKcal,
+          burnedKcalFromSport: burnedKcal,
+          effectiveTargetKcal: Number(user.target || 2000) + burnedKcal,
+          foods: foodItems.map(i => ({ name: i.name, amountG: i.amount, cal: Math.round(i.calories), p: Math.round(i.protein), c: Math.round(i.carbs), f: Math.round(i.fat) })),
+          activities: actItems.map(a => ({ name: a.name, durationMin: a.durationMinutes, burnedKcal: a.burnedCalories }))
+        };
+      }))}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error.message);
@@ -1769,7 +1942,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     if (!user.geminiApiKey) return "🍽️";
     try {
       const prompt = `Welches einzelne, passendste Emoji beschreibt "${name}" am besten? Antworte NUR mit GENAU EINEM Emoji und absolut keinem weiteren Text.`;
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1860,10 +2033,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     try {
       const prompt = `Analysiere folgendes Essen (Bild und/oder Text): ${text || "das Bild"}. 
                     WICHTIGSTE REGEL: Gib IMMER und AUSNAHMSLOS die Nährwerte für exakt 100 Gramm an!
-                    Schätze bei 'estimatedPortionWeight' das ungefähre Gesamtgewicht der gesamten Mahlzeit/Portion in Gramm (z.B. 350 für einen Teller Nudeln, 140 für 7 Nuggets).
+                    Schätze bei 'estimatedPortionWeight' das ungefähre Gesamtgewicht der gesamten Mahlzeit/Portion in Gramm (z.B. 350 für einen Teller Menemen oder Nudeln, 140 für 7 Nuggets).
                     SMARTE EINHEIT:
-                    - Wenn es sich um echt zählbare Stückgüter handelt (z.B. Eier, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Burger, Dosen, Würstchen oder Proteinpulver/Whey mit 'Scoop' ca. 30g), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 20 für 1 Nugget, 55 für 1 Ei, 30 für 1 Scoop) an.
-                    - Bei Schüttgut, Tellern, Schüsseln, gemischten Mahlzeiten (z.B. Pasta, Reis mit Beilage, Bowls, Curry, Salat, Müsli, Steak, Auflauf) setze 'unitName': null und 'pieceWeight': null. Verwende NIEMALS "Portion", "Teller", "Schale" oder "Mahlzeit" als unitName!
+                    - NUR wenn es sich um echte, einzeln zählbare Stückgüter handelt (z.B. gekochtes Ei/Spiegelei, Nuggets, Toast/Brot-Scheiben, Banane, Apfel, Riegel, Cookies, Brötchen, Simit, Lahmacun, Burger, Dosen, Würstchen oder Proteinpulver/Whey mit 'Scoop' ca. 30g), gib 'unitName' (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und 'pieceWeight' (Gewicht von genau 1 Stück in Gramm, z.B. 20 für 1 Nugget, 55 für 1 Ei, 30 für 1 Scoop) an.
+                    - Bei gekochten Gerichten, Pfannengerichten, Tellergerichten, Schüsseln, Beilagen und gemischten Mahlzeiten (z.B. Menemen, Rührei, Shakshuka, Omelett, Pasta, Reisgerichte, Pilav, Bulgur, Bowls, Curry, Salat, Suppe, Eintopf, Müsli, Porridge, Quark, Steak, Hähnchenbrust, Auflauf, Lasagne, Gulasch) macht "Stück" KEINEN Sinn! Setze dort IMMER 'unitName': null und 'pieceWeight': null! Verwende NIEMALS "Portion", "Teller", "Pfanne", "Schale" oder "Mahlzeit" als unitName!
                     Wähle GENAU EIN passendes Emoji aus.
                     Gib AUSSCHLIESSLICH ein einziges, valides JSON-Objekt zurück.
                     Format: {"name":"string", "calories":int, "protein":float, "carbs":float, "sugar":float, "fat":float, "saturatedFat":float, "estimatedPortionWeight":int, "unitName":string|null, "pieceWeight":int|null, "emoji":"string"}`;
@@ -1878,13 +2051,14 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           data: img.split(',')[1]
         }
       });
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${user.geminiApiKey}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          contents
+          contents,
+          generationConfig: { response_mime_type: "application/json" }
         })
       });
       const data = await res.json();
@@ -1909,18 +2083,11 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       json.fat = Number(json.fat) || 0;
       json.saturatedFat = Number(json.saturatedFat) || 0;
       if (json.pieceWeight) json.pieceWeight = Number(json.pieceWeight);
-      if (json.unitName) {
-        json.unitName = String(json.unitName).trim();
-        if (
-          json.unitName.toLowerCase().includes('portion') || 
-          json.unitName.toLowerCase().includes('teller') || 
-          json.unitName.toLowerCase().includes('schale') || 
-          json.unitName.toLowerCase().includes('mahlzeit')
-        ) {
-          json.unitName = null;
-          json.pieceWeight = null;
-        }
-      }
+
+      // Prüfe mit getSmartFoodUnit, ob die Einheit für dieses Essen wirklich Sinn ergibt
+      const validatedUnit = getSmartFoodUnit(json);
+      json.unitName = validatedUnit ? validatedUnit.unitName : null;
+      json.pieceWeight = validatedUnit ? validatedUnit.pieceWeight : null;
 
       // Sicherstellen, dass nur EIN Emoji genommen wird
       if (json.emoji) {
@@ -1933,6 +2100,8 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
         image: img
       });
       if (json.estimatedPortionWeight) setAmount(json.estimatedPortionWeight);
+      else if (validatedUnit) setAmount(validatedUnit.pieceWeight);
+      else setAmount(100);
       setShowAiModal(false);
       setAiImage(null);
       setAiDesc('');
@@ -1949,13 +2118,15 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     const rawUF = food.baseUnsaturatedFat !== undefined ? Number(food.baseUnsaturatedFat) : (food.unsaturatedFat !== undefined ? Number(food.unsaturatedFat) : Math.max(0, rawF - rawSF));
     const uInfo = getSmartFoodUnit(food);
     setSelectedFood({
+      id: food.id,
+      isRecipe: food.isRecipe,
       name: food.name,
       emoji: food.emoji,
       image: food.image,
       isBarcode: food.isBarcode,
       isAi: food.isAi,
-      unitName: uInfo?.unitName ?? food.unitName,
-      pieceWeight: uInfo?.pieceWeight ?? food.pieceWeight,
+      unitName: uInfo ? uInfo.unitName : null,
+      pieceWeight: uInfo ? uInfo.pieceWeight : null,
       calories: Math.round(Number(food.baseCalories ?? food.calories ?? 0)),
       protein: Math.round((Number(food.baseProtein ?? food.protein ?? 0)) * 10) / 10,
       carbs: Math.round((Number(food.baseCarbs ?? food.carbs ?? 0)) * 10) / 10,
@@ -1971,7 +2142,12 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
     const rawF = Number(item.baseFat ?? 0);
     const rawSF = Number(item.baseSaturatedFat ?? 0);
     const rawUF = item.baseUnsaturatedFat !== undefined ? Number(item.baseUnsaturatedFat) : Math.max(0, rawF - rawSF);
+    const uInfo = getSmartFoodUnit(item);
+    const exactAmount = item.amount !== undefined ? Number(item.amount) : Math.round((Number(item.amountFactor) || 1) * 100);
+    const wasGramMode = item.entryUnitMode === 'gram' || (item.amountDisplay && /^\d+([.,]\d+)?\s*g$/i.test(String(item.amountDisplay).trim()));
     setSelectedFood({
+      id: item.id,
+      isRecipe: item.isRecipe,
       name: item.name,
       calories: Math.round(Number(item.baseCalories ?? 0)),
       protein: Math.round(Number(item.baseProtein ?? 0) * 10) / 10,
@@ -1984,10 +2160,11 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       image: item.image,
       isBarcode: item.isBarcode,
       isAi: item.isAi,
-      unitName: item.unitName,
-      pieceWeight: item.pieceWeight
+      unitName: uInfo ? uInfo.unitName : null,
+      pieceWeight: uInfo ? uInfo.pieceWeight : null,
+      preferredUnitMode: uInfo ? (wasGramMode ? 'gram' : 'unit') : 'gram'
     });
-    setAmount(Math.round(item.amountFactor * 100));
+    setAmount(exactAmount);
     setEditingInstanceId(item.instanceId);
     setShowDetails(null);
   };
@@ -2017,12 +2194,17 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       unitLabel = 'Scoops';
     }
 
+    const effectiveMode = (unitInfo && entryUnitMode === 'unit') ? 'unit' : 'gram';
+
     const entry = {
+      id: food.id || generateId(),
+      isRecipe: Boolean(food.isRecipe),
       name: baseProps.name,
       instanceId: editingInstanceId || generateId(),
       amount: safeAmount,
       amountFactor: factor,
-      amountDisplay: unitInfo && entryUnitMode === 'unit' && countDisplay
+      entryUnitMode: effectiveMode,
+      amountDisplay: effectiveMode === 'unit' && countDisplay
         ? `${countDisplay} ${unitLabel} (${safeAmount}g)`
         : `${safeAmount}g`,
       unitName: unitInfo?.unitName || null,
@@ -2097,9 +2279,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
             <div className="text-3xl shrink-0">${showDetails?.emoji || "🍽️"}</div>
             <div className="flex-1 min-w-0">
               <h3 className="text-xl sm:text-2xl font-black text-white leading-tight break-words">${showDetails?.name || "Unbenannt"}</h3>
-              ${showDetails?.amountDisplay ? html`
-                <div className="text-xs font-bold text-brand-400 mt-0.5">${showDetails.amountDisplay}</div>
-              ` : ''}
+              <div className="text-xs font-bold text-brand-400 mt-0.5">${formatFoodAmountDisplay(showDetails)}</div>
             </div>
             <button onClick=${() => { triggerHaptic('light'); setShowDetails(null); }} className="shrink-0 p-2 bg-slate-800 rounded-full"><${XIcon} size=${20}/></button>
           </div>
@@ -2531,8 +2711,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
           `)}
         </div>
       ` : (activeTab === 'frequent' ? frequentItems : recentItems).map(item => {
-        const portionWeight = item.lastAmount || 100;
+        const uInfo = getSmartFoodUnit(item);
+        const portionWeight = item.lastAmount || (uInfo ? uInfo.pieceWeight : 100);
         const portionCalories = Math.round((Number(item.baseCalories ?? item.calories ?? 0)) * (portionWeight / 100));
+        const portionDisplay = formatFoodAmountDisplay({ ...item, amount: portionWeight, amountDisplay: null });
         return html`
           <${SwipeableItem}
             key=${item.name}
@@ -2546,7 +2728,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                 </div>
                 <div className="flex-1 min-w-0 py-0.5">
                   <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-                  <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionWeight}g | ${portionCalories} kcal</div>
+                  <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionDisplay} | ${portionCalories} kcal</div>
                 </div>
               </div>
               <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
@@ -2564,8 +2746,10 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
       </div>
       <div className="space-y-2.5">
         ${searchResults.map(f => {
-          const portionWeight = f.lastAmount || 100;
+          const uInfo = getSmartFoodUnit(f);
+          const portionWeight = f.lastAmount || (uInfo ? uInfo.pieceWeight : 100);
           const portionCalories = Math.round((Number(f.baseCalories ?? f.calories ?? 0)) * (portionWeight / 100));
+          const portionDisplay = formatFoodAmountDisplay({ ...f, amount: portionWeight, amountDisplay: null });
           return html`
             <${SwipeableItem}
               key=${f.id || f.name}
@@ -2588,7 +2772,7 @@ Antworte AUSSCHLIESSLICH mit einem validen JSON-Objekt in diesem exakten Format:
                       <span>${f.name}</span>
                       ${f.isRecipe ? html`<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">Rezept</span>` : ''}
                     </div>
-                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionWeight}g | ${portionCalories} kcal</div>
+                    <div className="text-[10px] font-black text-slate-500 uppercase truncate">${portionDisplay} | ${portionCalories} kcal</div>
                   </div>
                 </div>
                 <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
@@ -2639,7 +2823,7 @@ ${showRecipeModal && (() => {
   const totalF = Math.round(recipeDraft.ingredients.reduce((acc, i) => acc + (i.baseFat * (i.grams / 100)), 0) * 10) / 10;
 
   const historyMatches = draftIngSearch.trim().length > 0 
-    ? (Array.isArray(itemHistory) ? itemHistory : []).filter(h => h?.name?.toLowerCase().includes(draftIngSearch.toLowerCase())).slice(0, 5)
+    ? allSavedFoods.filter(h => !h.isRecipe && h?.name?.toLowerCase().includes(draftIngSearch.toLowerCase())).slice(0, 5)
     : [];
 
   return html`
@@ -2805,18 +2989,7 @@ ${showRecipeModal && (() => {
                 <button
                   onClick=${() => {
                     triggerHaptic('light');
-                    if (!draftSelectedFood && draftIngSearch.trim()) {
-                      setDraftSelectedFood({
-                        name: draftIngSearch.trim(),
-                        calories: 100,
-                        protein: 0,
-                        carbs: 0,
-                        sugar: 0,
-                        fat: 0,
-                        saturatedFat: 0
-                      });
-                    }
-                    setTimeout(addIngredientToDraft, 50);
+                    addIngredientToDraft();
                   }}
                   className="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white font-black text-xs rounded-xl uppercase tracking-wider active:scale-95 transition-all shadow-md flex items-center justify-center gap-1.5"
                 >
@@ -3183,7 +3356,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.3 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v3.4 Live</span>
     </div>
     <button 
       type="button" 
@@ -3369,7 +3542,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=3.3').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=3.4').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
