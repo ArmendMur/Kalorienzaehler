@@ -1322,7 +1322,7 @@ function App() {
   const [emojiPickerConfig, setEmojiPickerConfig] = useState(null);
   const [customEmojiInput, setCustomEmojiInput] = useState('');
   const [isAddingIngredient, setIsAddingIngredient] = useState(false);
-  const CURRENT_APP_VERSION = 'v4.7';
+  const CURRENT_APP_VERSION = 'v4.8';
   const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Neues Update verfügbar...' });
   const lastUpdateCheckRef = useRef(0);
 
@@ -3174,50 +3174,51 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
             const rP = Math.round((Number(rec.baseProtein ?? rec.protein ?? 0)) * (rWeight / 100));
             const rC = Math.round((Number(rec.baseCarbs ?? rec.carbs ?? 0)) * (rWeight / 100));
             const rF = Math.round((Number(rec.baseFat ?? rec.fat ?? 0)) * (rWeight / 100));
+            const totalMacroG = rP + rC + rF;
             return html`
             <${SwipeableItem}
               key=${rec.id}
               onSelect=${() => selectFood(rec)}
               onDelete=${() => setRecipes(prev => prev.filter(r => r.id !== rec.id))}
             >
-              <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="glass-card px-4 py-3.5 rounded-[1.8rem] flex justify-between items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
                     ${rec.emoji || '🥗'}
                   </div>
                   <div className="flex-1 min-w-0 py-0.5">
-                    <div className="font-bold text-sm text-white break-words leading-snug">${rec.name}</div>
-                    <div className="text-[11px] font-black text-slate-400 truncate mt-0.5">
-                      <span>${rWeight}g</span>
-                      <span className="mx-1.5 text-slate-600">|</span>
-                      <span className="text-brand-400">${rKcal} kcal</span>
+                    <div className="font-bold text-sm text-white break-words leading-snug flex items-center gap-1.5">
+                      <span>${rec.name}</span>
+                      <button
+                        type="button"
+                        onClick=${e => { e.stopPropagation(); triggerHaptic('light'); openEditRecipe(rec); }}
+                        className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg active:scale-90 transition-all shrink-0"
+                        title="Rezept bearbeiten"
+                      >
+                        <${EditIcon} size=${13}/>
+                      </button>
                     </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-black whitespace-nowrap truncate mt-0.5">
-                      <span className="text-fuchsia-400">P ${rP}g</span>
-                      <span className="text-slate-600">·</span>
-                      <span className="text-blue-400">K ${rC}g</span>
-                      <span className="text-slate-600">·</span>
-                      <span className="text-amber-400">F ${rF}g</span>
+                    <div className="text-[11px] font-bold text-slate-200 truncate mt-0.5">
+                      ${rWeight}g
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 ml-2" onClick=${e => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick=${() => { triggerHaptic('light'); openEditRecipe(rec); }}
-                    className="p-2 text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-800 rounded-xl border border-white/5 active:scale-90 transition-all"
-                    title="Rezept bearbeiten"
-                  >
-                    <${EditIcon} size=${15}/>
-                  </button>
-                  <button
-                    type="button"
-                    onClick=${() => selectFood(rec)}
-                    className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm active:scale-90 transition-all"
-                    title="Hinzufügen"
-                  >
-                    <${PlusIcon} size=${16}/>
-                  </button>
+                <div className="shrink-0 text-right pl-2 flex flex-col items-end justify-center">
+                  <div className="text-sm font-black text-brand-400 whitespace-nowrap">${rKcal} <span className="text-[10px] font-bold text-brand-400">kcal</span></div>
+                  <div className="flex items-center gap-1 text-[9px] font-black mt-0.5 whitespace-nowrap">
+                    <span className="text-fuchsia-400">P ${rP}g</span>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-blue-400">K ${rC}g</span>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-amber-400">F ${rF}g</span>
+                  </div>
+                  ${totalMacroG > 0 && html`
+                    <div className="mt-1.5 flex h-1 w-[84px] min-w-[84px] max-w-[84px] overflow-hidden rounded-full bg-slate-800/80" title="Verhältnis: P / K / F">
+                      ${rP > 0 && html`<div style=${{ flex: rP }} className="bg-fuchsia-400 h-full"/>`}
+                      ${rC > 0 && html`<div style=${{ flex: rC }} className="bg-blue-400 h-full"/>`}
+                      ${rF > 0 && html`<div style=${{ flex: rF }} className="bg-amber-400 h-full"/>`}
+                    </div>
+                  `}
                 </div>
               </div>
             </${SwipeableItem}>
@@ -3231,6 +3232,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
         const portionP = Math.round((Number(item.baseProtein ?? item.protein ?? 0)) * (portionWeight / 100));
         const portionC = Math.round((Number(item.baseCarbs ?? item.carbs ?? 0)) * (portionWeight / 100));
         const portionF = Math.round((Number(item.baseFat ?? item.fat ?? 0)) * (portionWeight / 100));
+        const totalMacroG = portionP + portionC + portionF;
         const portionDisplay = formatFoodAmountDisplay({ ...item, amount: portionWeight, amountDisplay: null });
         return html`
           <${SwipeableItem}
@@ -3238,29 +3240,37 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
             onSelect=${() => selectFood(item)}
             onDelete=${() => deleteSavedFood(item.name)}
           >
-            <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="glass-card px-4 py-3.5 rounded-[1.8rem] flex justify-between items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
+              <div className="flex items-center gap-3.5 min-w-0 flex-1">
                 <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
                   ${getItemDisplay(item)}
                 </div>
                 <div className="flex-1 min-w-0 py-0.5">
-                  <div className="font-bold text-sm text-white break-words leading-snug">${item.name}</div>
-                  <div className="text-[11px] font-black text-slate-400 truncate mt-0.5">
-                    <span>${portionDisplay}</span>
-                    <span className="mx-1.5 text-slate-600">|</span>
-                    <span className="text-brand-400">${portionCalories} kcal</span>
+                  <div className="font-bold text-sm text-white break-words leading-snug flex items-center gap-2">
+                    <span>${item.name}</span>
+                    ${item.isRecipe ? html`<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">Rezept</span>` : ''}
                   </div>
-                  <div className="flex items-center gap-1.5 text-[10px] font-black whitespace-nowrap truncate mt-0.5">
-                    <span className="text-fuchsia-400">P ${portionP}g</span>
-                    <span className="text-slate-600">·</span>
-                    <span className="text-blue-400">K ${portionC}g</span>
-                    <span className="text-slate-600">·</span>
-                    <span className="text-amber-400">F ${portionF}g</span>
+                  <div className="text-[11px] font-bold text-slate-200 truncate mt-0.5">
+                    ${portionDisplay}
                   </div>
                 </div>
               </div>
-              <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
-                <${PlusIcon} size=${16}/>
+              <div className="shrink-0 text-right pl-2 flex flex-col items-end justify-center">
+                <div className="text-sm font-black text-brand-400 whitespace-nowrap">${portionCalories} <span className="text-[10px] font-bold text-brand-400">kcal</span></div>
+                <div className="flex items-center gap-1 text-[9px] font-black mt-0.5 whitespace-nowrap">
+                  <span className="text-fuchsia-400">P ${portionP}g</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-blue-400">K ${portionC}g</span>
+                  <span className="text-slate-600">·</span>
+                  <span className="text-amber-400">F ${portionF}g</span>
+                </div>
+                ${totalMacroG > 0 && html`
+                  <div className="mt-1.5 flex h-1 w-[84px] min-w-[84px] max-w-[84px] overflow-hidden rounded-full bg-slate-800/80" title="Verhältnis: P / K / F">
+                    ${portionP > 0 && html`<div style=${{ flex: portionP }} className="bg-fuchsia-400 h-full"/>`}
+                    ${portionC > 0 && html`<div style=${{ flex: portionC }} className="bg-blue-400 h-full"/>`}
+                    ${portionF > 0 && html`<div style=${{ flex: portionF }} className="bg-amber-400 h-full"/>`}
+                  </div>
+                `}
               </div>
             </div>
           </${SwipeableItem}>
@@ -3280,6 +3290,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
           const portionP = Math.round((Number(f.baseProtein ?? f.protein ?? 0)) * (portionWeight / 100));
           const portionC = Math.round((Number(f.baseCarbs ?? f.carbs ?? 0)) * (portionWeight / 100));
           const portionF = Math.round((Number(f.baseFat ?? f.fat ?? 0)) * (portionWeight / 100));
+          const totalMacroG = portionP + portionC + portionF;
           const portionDisplay = formatFoodAmountDisplay({ ...f, amount: portionWeight, amountDisplay: null });
           return html`
             <${SwipeableItem}
@@ -3293,8 +3304,8 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
                 }
               }}
             >
-              <div className="glass-card p-4 rounded-[1.8rem] flex justify-between items-center cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
-                <div className="flex items-center gap-4 flex-1 min-w-0">
+              <div className="glass-card px-4 py-3.5 rounded-[1.8rem] flex justify-between items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
                   <div className="shrink-0 w-11 h-11 min-w-[2.75rem] min-h-[2.75rem] aspect-square rounded-xl bg-slate-800/50 flex items-center justify-center text-xl shadow-inner border border-white/5">
                     ${getItemDisplay(f)}
                   </div>
@@ -3303,22 +3314,27 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
                       <span>${f.name}</span>
                       ${f.isRecipe ? html`<span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500/10 text-brand-400 border border-brand-500/20">Rezept</span>` : ''}
                     </div>
-                    <div className="text-[11px] font-black text-slate-400 truncate mt-0.5">
-                      <span>${portionDisplay}</span>
-                      <span className="mx-1.5 text-slate-600">|</span>
-                      <span className="text-brand-400">${portionCalories} kcal</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[10px] font-black whitespace-nowrap truncate mt-0.5">
-                      <span className="text-fuchsia-400">P ${portionP}g</span>
-                      <span className="text-slate-600">·</span>
-                      <span className="text-blue-400">K ${portionC}g</span>
-                      <span className="text-slate-600">·</span>
-                      <span className="text-amber-400">F ${portionF}g</span>
+                    <div className="text-[11px] font-bold text-slate-200 truncate mt-0.5">
+                      ${portionDisplay}
                     </div>
                   </div>
                 </div>
-                <div className="p-2 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20 shadow-sm ml-2">
-                  <${PlusIcon} size=${16}/>
+                <div className="shrink-0 text-right pl-2 flex flex-col items-end justify-center">
+                  <div className="text-sm font-black text-brand-400 whitespace-nowrap">${portionCalories} <span className="text-[10px] font-bold text-brand-400">kcal</span></div>
+                  <div className="flex items-center gap-1 text-[9px] font-black mt-0.5 whitespace-nowrap">
+                    <span className="text-fuchsia-400">P ${portionP}g</span>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-blue-400">K ${portionC}g</span>
+                    <span className="text-slate-600">·</span>
+                    <span className="text-amber-400">F ${portionF}g</span>
+                  </div>
+                  ${totalMacroG > 0 && html`
+                    <div className="mt-1.5 flex h-1 w-[84px] min-w-[84px] max-w-[84px] overflow-hidden rounded-full bg-slate-800/80" title="Verhältnis: P / K / F">
+                      ${portionP > 0 && html`<div style=${{ flex: portionP }} className="bg-fuchsia-400 h-full"/>`}
+                      ${portionC > 0 && html`<div style=${{ flex: portionC }} className="bg-blue-400 h-full"/>`}
+                      ${portionF > 0 && html`<div style=${{ flex: portionF }} className="bg-amber-400 h-full"/>`}
+                    </div>
+                  `}
                 </div>
               </div>
             </${SwipeableItem}>
@@ -3945,7 +3961,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.7 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.8 Live</span>
     </div>
     <button 
       type="button" 
@@ -4131,7 +4147,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=4.7').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=4.8').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
