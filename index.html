@@ -163,9 +163,21 @@ const getItemDisplay = (item, isLarge = false) => {
   return html`<div className=${`flex items-center justify-center w-full h-full ${isLarge ? 'text-3xl' : 'text-xl'}`}>🍽️</div>`;
 };
 
+// Zählbarer "Träger" am Anfang des Namens (auch Komposita wie "Butterkeks", "Hähnchenwrap", "Käsebrötchen")
+const COUNTABLE_HEAD_REGEX = /(brötchen|broetchen|semmel|schrippe|toast|toastbrot|brotscheibe|burger|döner|doener|dürüm|dueruem|wrap|wraps|tortilla|burrito|quesadilla|taco|tacos|sandwich|baguette|bagel|croissant|brezel|pfannkuchen|pancake|pancakes|crêpe|crepe|waffel|waffeln|knäckebrot|reiswaffel|keks|kekse|cookie|cookies|riegel|muffin|donut|berliner|krapfen|lahmacun|pide|simit|börek|boerek|hotdog|hot\s*dog|würstchen|wuerstchen|bratwurst|currywurst|frikadelle|praline|banane|apfel)$/i;
+
+const getNameHead = (name) => String(name || '').toLowerCase().trim().split(/\s+(?:mit|und|in\s+soße|in\s+sauce|auf|an)\s+/i)[0].trim();
+
 const isDishOrBulkFood = (rawName) => {
   if (!rawName) return false;
   const name = String(rawName).toLowerCase().trim();
+
+  // Beginnt der Name mit einem zählbaren Träger (z.B. "Wrap mit Hähnchen & Salat", "Butterkeks mit Schokolade"),
+  // ist es KEIN Tellergericht – auch wenn später Wörter wie "Salat" oder "Soße" vorkommen.
+  const head = getNameHead(name);
+  if (head && head.split(/\s+/).length <= 3 && COUNTABLE_HEAD_REGEX.test(head.split(/\s+/).pop())) {
+    return false;
+  }
 
   // Explizite Gerichte, Pfannengerichte, Schüsselgerichte & Beilagen, bei denen "Stück" keinen Sinn ergibt
   if (/\b(menemen|shakshuka|rührei|ruehrei|omelett|omelette|sucuklu yumurta|mıhlama|mihlama|kuymak|pfanne|auflauf|gratin|suppe|eintopf|brühe|bruehe|çorba|corba|curry|bowl|salat|kisir|kısır|pasta|nudeln|spaghetti|penne|tagliatelle|maccheroni|gnocchi|lasagne|bolognese|carbonara|manti|mantı|reis|pilav|risotto|paella|bulgur|couscous|quinoa|gulasch|geschnetzeltes|ragout|sote|tavuk sote|et sote|kuru fasulye|nohut|mercimek|chili|linsen|kichererbsen|gemüse|gemuese|ratatouille|pommes|wedges|bratkartoffeln|kartoffelbrei|kartoffelpüree|püree|pueree|stampf|müsli|muesli|porridge|oatmeal|haferflocken|overnight oats|grießbrei|griessbrei|milchreis|pudding|quark|skyr|hüttenkäse|huettenkaese|frischkäse|frischkaese|iskender|dönerbox|doenerbox|dönerteller|doenerteller|dönerfleisch|doenerfleisch|kebabteller|karnıyarık|karniyarik|imam bayildi|güveç|guevec|steak|filet|hähnchenbrust|haehnchenbrust|putenbrust|hackfleisch|gyros|lachs|lachsfilet|thunfisch|forelle|kabeljau|spinat|brokkoli|blumenkohl|rosenkohl|rotkohl|sauerkraut|champignons|pilzpfanne|tofu|tiramisu|obstsalat|cacik|cacık|tzatziki|hummus|humus|guacamole|ezme|haydari|soße|sauce|beilage|teller|gericht|mahlzeit|schale|schüssel|schuessel)\b/i.test(name)) {
@@ -213,7 +225,15 @@ const getKnownCountableUnit = (rawName, food = null) => {
   if (/\b(simit)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 110 };
   if (/\b(muffin|donut|berliner|krapfen|pfannkuchen|pancake|pancakes|waffel|waffeln|crêpe|crepe)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 75 };
   if (/\b(riegel|proteinriegel|müsliriegel|muesliriegel|schokoriegel|corny|duplo|hanuta|knoppers|kinderriegel|kinder\s+bueno|kinder\s+pingui|milchschnitte|snickers|mars|twix|bounty|kitkat|balisto)\b/i.test(name)) return { unitName: 'Riegel', pieceWeight: 45 };
-  if (/\b(keks|kekse|cookie|cookies|oreo|spekulatius|lebkuchen|baklava|praline|ferrero|raffaello)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 25 };
+  if (/(butterkeks|leibniz|vollkornkeks|haferkeks|löffelbiskuit|loeffelbiskuit)/i.test(name)) return { unitName: 'Stück', pieceWeight: 12 };
+  if (/(keks|kekse|cookie|cookies)\b/i.test(name) || /\b(oreo|spekulatius|lebkuchen|baklava|praline|ferrero|raffaello)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 25 };
+  if (/\b(tortilla|tortillas|wrapfladen|wrap-fladen|tortillafladen)\b/i.test(name) && !/chips/i.test(name)) return { unitName: 'Stück', pieceWeight: 60 };
+  if (/(wrap|wraps|burrito|burritos)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 250 };
+  if (/\b(quesadilla|quesadillas)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 180 };
+  if (/\b(taco|tacos)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 90 };
+  if (/(sandwich|baguette)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 180 };
+  if (/\b(hotdog|hot\s*dog)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 150 };
+  if (/\b(pide)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 300 };
   if (/\b(burger|cheeseburger|hamburger|chickenburger)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 200 };
   if (/\b(döner|doener|dürüm|dueruem)\b/i.test(name) && !/teller|box|fleisch/i.test(name)) return { unitName: 'Stück', pieceWeight: 350 };
   if (/\b(lahmacun)\b/i.test(name)) return { unitName: 'Stück', pieceWeight: 150 };
@@ -266,22 +286,58 @@ const getSmartFoodUnit = (food) => {
       return { unitName: normalizedName, pieceWeight: Number(food.pieceWeight) };
     }
 
-    // Bei "Stück" nur dann erlauben, wenn es wirklich ein bekanntes Stückgut ist
-    // (verhindert, dass Gerichte wie Menemen fälschlicherweise als "1 Stück" angezeigt werden)
+    // "Stück" von KI/Barcode vertrauen – Tellergerichte wurden oben bereits per isDishOrBulkFood ausgeschlossen
     if (/^(stück|stueck|stk\.?)$/i.test(uLower)) {
-      if (knownUnit) {
-        return { unitName: knownUnit.unitName, pieceWeight: Number(food.pieceWeight) || knownUnit.pieceWeight };
-      }
-      return null;
+      return { unitName: knownUnit?.unitName || 'Stück', pieceWeight: Number(food.pieceWeight) };
     }
+
+    // Sonstige konkrete Einheiten (z.B. "Packung", "Stange", "Kugel") ebenfalls übernehmen
+    return { unitName: uName, pieceWeight: Number(food.pieceWeight) };
   }
 
   return knownUnit;
 };
 
+// Liefert die Einheit für den Stück/Gramm-Umschalter + den sinnvollsten Standard-Modus.
+// - Zählbare Lebensmittel (Wrap, Keks, Ei ...): Einheit "Stück" etc., Standard = Stück
+// - Gerichte (Menemen, Pasta ...): Fallback-Einheit "Portion", Standard = Gramm (Umschalten bleibt möglich)
+// - Eine früher vom Nutzer gewählte Ansicht (preferredUnitMode) hat immer Vorrang.
+const getEntryUnitInfo = (food) => {
+  if (!food) return { unit: null, defaultMode: 'gram' };
+  const pref = (food.preferredUnitMode === 'gram' || food.preferredUnitMode === 'unit') ? food.preferredUnitMode : null;
+  const smart = getSmartFoodUnit(food);
+  if (smart) return { unit: smart, defaultMode: pref || 'unit' };
+  const portionW = Math.round(Number(
+    food.portionWeight ||
+    (/^portion(en)?$/i.test(String(food.unitName || '')) ? food.pieceWeight : 0) ||
+    food.estimatedPortionWeight || 0
+  ));
+  if (portionW > 0) return { unit: { unitName: 'Portion', pieceWeight: portionW, isPortionFallback: true }, defaultMode: pref || 'gram' };
+  return { unit: null, defaultMode: 'gram' };
+};
+
+const pluralizeUnit = (unitName, count) => {
+  const u = String(unitName || '');
+  if (!(count > 1)) return u;
+  const lower = u.toLowerCase();
+  if (lower === 'scoop') return 'Scoops';
+  if (lower === 'portion') return 'Portionen';
+  if (lower === 'scheibe') return 'Scheiben';
+  if (lower === 'dose') return 'Dosen';
+  if (lower === 'flasche') return 'Flaschen';
+  if (lower === 'kugel') return 'Kugeln';
+  if (lower === 'tasse') return 'Tassen';
+  return u;
+};
+
 const formatFoodAmountDisplay = (item) => {
   if (!item) return '100g';
   const grams = Math.round(Number(item.amount || (item.amountFactor ? item.amountFactor * 100 : (item.lastAmount || 100))));
+
+  // Neue Einträge: gespeicherte Ansicht (Stück/Portion oder Gramm) exakt so anzeigen, wie sie gewählt wurde
+  if (item.entryUnitMode === 'gram') return `${grams}g`;
+  if (item.entryUnitMode === 'unit' && item.amountDisplay) return item.amountDisplay;
+
   const unitInfo = getSmartFoodUnit(item);
 
   // Wenn für dieses Gericht keine Stück-Einheit Sinn ergibt (z.B. Menemen), zeige IMMER nur Gramm an
@@ -302,8 +358,7 @@ const formatFoodAmountDisplay = (item) => {
   const pieceCount = Math.round(rawCount * 10) / 10;
   if (pieceCount <= 0) return `${grams}g`;
   const countDisplay = Number.isInteger(pieceCount) ? pieceCount : pieceCount.toString().replace('.', ',');
-  let unitLabel = unitInfo.unitName;
-  if (unitLabel.toLowerCase() === 'scoop' && pieceCount > 1) unitLabel = 'Scoops';
+  const unitLabel = pluralizeUnit(unitInfo.unitName, pieceCount);
   return `${countDisplay} ${unitLabel} (${grams}g)`;
 };
 
@@ -1157,7 +1212,7 @@ function App() {
   const [emojiPickerConfig, setEmojiPickerConfig] = useState(null);
   const [customEmojiInput, setCustomEmojiInput] = useState('');
   const [isAddingIngredient, setIsAddingIngredient] = useState(false);
-  const CURRENT_APP_VERSION = 'v4.2';
+  const CURRENT_APP_VERSION = 'v4.3';
   const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Neues Update verfügbar...' });
   const lastUpdateCheckRef = useRef(0);
 
@@ -1219,14 +1274,7 @@ function App() {
 
   useEffect(() => {
     if (selectedFood) {
-      const u = getSmartFoodUnit(selectedFood);
-      if (!u) {
-        setEntryUnitMode('gram');
-      } else if (selectedFood.preferredUnitMode === 'gram' || selectedFood.preferredUnitMode === 'unit') {
-        setEntryUnitMode(selectedFood.preferredUnitMode);
-      } else {
-        setEntryUnitMode('unit');
-      }
+      setEntryUnitMode(getEntryUnitInfo(selectedFood).defaultMode);
       setUnitStepSize(1);
     }
   }, [selectedFood?.name, selectedFood?.instanceId, selectedFood?.id, selectedFood?.preferredUnitMode]);
@@ -1712,6 +1760,8 @@ Antworte AUSSCHLIESSLICH mit validem JSON:
                 baseUnsaturatedFat: baseUF,
                 unitName: it.unitName || existing?.unitName,
                 pieceWeight: it.pieceWeight || existing?.pieceWeight,
+                portionWeight: it.portionWeight || existing?.portionWeight,
+                preferredUnitMode: it.entryUnitMode || existing?.preferredUnitMode,
                 lastAmount: actualAmount || existing?.lastAmount || 100,
                 count: count
               });
@@ -2262,7 +2312,8 @@ Tagebuch-Daten: ${JSON.stringify(days.sort((a, b) => a.date.localeCompare(b.date
           emoji: (emoji === '🍽️' && isWhey) ? '🥤' : emoji,
           isBarcode: true,
           unitName: detectedUnitName,
-          pieceWeight: detectedPieceWeight
+          pieceWeight: detectedPieceWeight,
+          portionWeight: parsedPortion && parsedPortion !== 100 ? Math.round(parsedPortion) : null
         };
         setSelectedFood(item);
         setAmount(Math.round(parsedPortion));
@@ -2288,7 +2339,7 @@ STRIKTE REGELN FÜR DIE ANALYSE:
    - Wenn der Nutzer im Text eine konkrete Menge nennt (z.B. "250g Magerquark" -> 250, "3 Eier" -> 165, "2 Scoops Whey" -> 60), übernimm exakt dieses Gesamtgewicht in Gramm als "estimatedPortionWeight"!
    - Wenn keine Menge genannt wurde oder ein Foto analysiert wird, schätze das realistische Gesamtgewicht der gesamten abgebildeten/üblichen Portion in Gramm (z.B. 350 für einen Teller Pasta/Menemen, 140 für 7 Nuggets).
 4. SMARTE EINHEIT ("unitName" & "pieceWeight"):
-   - NUR bei echten, einzeln zählbaren Stückgütern (z.B. Ei/Spiegelei, Nuggets, Toast/Brot-Scheibe, Banane, Apfel, Riegel, Cookie, Brötchen, Simit, Lahmacun, Burger, Dose, Würstchen oder Proteinpulver/Whey/Kreatin mit "Scoop") gib "unitName" (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und "pieceWeight" (Gewicht von genau 1 Einheit in Gramm, z.B. 55 für 1 Ei, 20 für 1 Nugget, 30 für 1 Scoop Whey) an.
+   - NUR bei echten, einzeln zählbaren Stückgütern (z.B. Ei/Spiegelei, Nuggets, Toast/Brot-Scheibe, Banane, Apfel, Riegel, Keks/Cookie, Brötchen, Wrap, Burrito, Sandwich, Döner/Dürüm, Simit, Lahmacun, Burger, Dose, Würstchen oder Proteinpulver/Whey/Kreatin mit "Scoop") gib "unitName" (z.B. "Stück", "Scheibe", "Riegel", "Dose", "Scoop") und "pieceWeight" (Gewicht von genau 1 Einheit in Gramm, z.B. 55 für 1 Ei, 20 für 1 Nugget, 250 für 1 gefüllten Wrap, 12 für 1 Butterkeks, 30 für 1 Scoop Whey) an. Das gilt auch, wenn der zählbare Träger gefüllt/belegt ist (z.B. "Wrap mit Hähnchen und Salat", "Brötchen mit Käse", "Butterkeks mit Schokolade" -> "Stück").
    - Bei Gerichten, Pfannengerichten, Tellergerichten, Schüsseln und Beilagen (z.B. Menemen, Rührei, Shakshuka, Omelett, Pasta, Reis, Pilav, Bulgur, Bowls, Curry, Salat, Suppe, Eintopf, Müsli, Porridge, Quark, Skyr, Steak, Hähnchenbrust, Auflauf, Lasagne, Gulasch) setze IMMER "unitName": null und "pieceWeight": null! Verwende NIEMALS "Portion", "Teller", "Pfanne", "Schale" oder "Mahlzeit" als unitName!
 5. PHYSIKALISCHE KONSISTENZ:
    - "sugar" <= "carbs"
@@ -2391,6 +2442,8 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
       isAi: food.isAi,
       unitName: uInfo ? uInfo.unitName : null,
       pieceWeight: uInfo ? uInfo.pieceWeight : null,
+      portionWeight: food.portionWeight || food.estimatedPortionWeight || food.lastAmount || null,
+      preferredUnitMode: food.preferredUnitMode || null,
       calories: Math.round(Number(food.baseCalories ?? food.calories ?? 0)),
       protein: Math.round((Number(food.baseProtein ?? food.protein ?? 0)) * 10) / 10,
       carbs: Math.round((Number(food.baseCarbs ?? food.carbs ?? 0)) * 10) / 10,
@@ -2427,7 +2480,10 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
       isAi: item.isAi,
       unitName: uInfo ? uInfo.unitName : null,
       pieceWeight: uInfo ? uInfo.pieceWeight : null,
-      preferredUnitMode: uInfo ? (wasGramMode ? 'gram' : 'unit') : 'gram'
+      portionWeight: item.portionWeight || (/^portion(en)?$/i.test(String(item.unitName || '')) ? item.pieceWeight : null) || exactAmount,
+      preferredUnitMode: item.entryUnitMode === 'unit' || item.entryUnitMode === 'gram'
+        ? item.entryUnitMode
+        : (uInfo ? (wasGramMode ? 'gram' : 'unit') : 'gram')
     });
     setAmount(exactAmount);
     setEditingInstanceId(item.instanceId);
@@ -2449,15 +2505,12 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
     };
     baseProps.unsaturatedFat = food.unsaturatedFat !== undefined ? Number(food.unsaturatedFat || 0) : Math.max(0, baseProps.fat - baseProps.saturatedFat);
     
-    const unitInfo = getSmartFoodUnit(food);
+    const unitInfo = getEntryUnitInfo(food).unit;
     const rawPieceCount = unitInfo ? (safeAmount / unitInfo.pieceWeight) : null;
     const pieceCount = rawPieceCount ? Math.round(rawPieceCount * 10) / 10 : null;
     const countDisplay = pieceCount ? (Number.isInteger(pieceCount) ? pieceCount : pieceCount.toString().replace('.', ',')) : null;
 
-    let unitLabel = unitInfo?.unitName || '';
-    if (unitLabel.toLowerCase() === 'scoop' && pieceCount > 1) {
-      unitLabel = 'Scoops';
-    }
+    const unitLabel = pluralizeUnit(unitInfo?.unitName || '', pieceCount);
 
     const effectiveMode = (unitInfo && entryUnitMode === 'unit') ? 'unit' : 'gram';
 
@@ -2475,6 +2528,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
         : `${safeAmount}g`,
       unitName: unitInfo?.unitName || null,
       pieceWeight: unitInfo?.pieceWeight || null,
+      portionWeight: unitInfo?.isPortionFallback ? unitInfo.pieceWeight : (food.portionWeight || null),
       emoji: baseProps.emoji,
       isBarcode: food.isBarcode,
       image: food.isAi ? null : food.image,
@@ -2700,7 +2754,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
       </div>`;
     })()}
     ${selectedFood && (() => {
-      const unitInfo = getSmartFoodUnit(selectedFood);
+      const unitInfo = getEntryUnitInfo(selectedFood).unit;
       const isUnitMode = Boolean(unitInfo && entryUnitMode === 'unit');
       const rawCount = unitInfo ? (Number(amount) || 0) / unitInfo.pieceWeight : 1;
       const roundedCount = unitInfo ? Math.round(rawCount * 10) / 10 : 1;
@@ -2776,7 +2830,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
                     }}
                     className="bg-transparent text-center text-2xl sm:text-3xl font-black text-white outline-none w-24"
                   />
-                  <span className="text-base sm:text-lg font-black text-white pointer-events-none">${(roundedCount > 1 && unitInfo.unitName.toLowerCase() === 'scoop') ? 'Scoops' : unitInfo.unitName}</span>
+                  <span className="text-base sm:text-lg font-black text-white pointer-events-none">${pluralizeUnit(unitInfo.unitName, roundedCount)}</span>
                 </div>
                 <div className="text-xs font-bold text-brand-400 mt-0.5">
                   ≈ ${Number.isInteger(amount) ? amount : Number(amount).toFixed(1).replace(/\.0$/, '').replace('.', ',')} g
@@ -2820,7 +2874,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
                 </div>
                 ${unitInfo ? html`
                   <div className="text-xs font-bold text-brand-400 mt-0.5">
-                    ≈ ${displayCount} ${(roundedCount > 1 && unitInfo.unitName.toLowerCase() === 'scoop') ? 'Scoops' : unitInfo.unitName}
+                    ≈ ${displayCount} ${pluralizeUnit(unitInfo.unitName, roundedCount)}
                   </div>
                 ` : ''}
               </div>
@@ -3804,7 +3858,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.2 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.3 Live</span>
     </div>
     <button 
       type="button" 
@@ -3990,7 +4044,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=4.2').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=4.3').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
