@@ -378,7 +378,7 @@ const getSmartFoodUnit = (food) => {
   if (!food) return null;
 
   // 1. Eigene Rezepte behalten immer ihre Rezept-/Portions-Einheit
-  if (food.isRecipe || (food.unitName && String(food.unitName).toLowerCase() === 'rezept')) {
+  if (food.isRecipe || Array.isArray(food.ingredients) || (food.unitName && String(food.unitName).toLowerCase() === 'rezept')) {
     const pWeight = Number(food.pieceWeight || food.estimatedPortionWeight || food.totalWeight || 100);
     return { unitName: food.unitName || 'Portion', pieceWeight: pWeight > 0 ? pWeight : 100 };
   }
@@ -1379,7 +1379,7 @@ function App() {
   const [emojiPickerConfig, setEmojiPickerConfig] = useState(null);
   const [customEmojiInput, setCustomEmojiInput] = useState('');
   const [isAddingIngredient, setIsAddingIngredient] = useState(false);
-  const CURRENT_APP_VERSION = 'v4.9';
+  const CURRENT_APP_VERSION = 'v5.0';
   const [updateBanner, setUpdateBanner] = useState({ visible: false, progress: 0, text: 'Neues Update verfügbar...' });
   const lastUpdateCheckRef = useRef(0);
 
@@ -1642,7 +1642,8 @@ function App() {
                       allSavedFoods.find(f => f?.name?.toLowerCase().includes(q));
       if (matched) {
         targetFood = matched;
-      } else if (user.geminiApiKey) {
+      } else {
+        if (!ensureApiKey()) return;
         setIsAddingIngredient(true);
         try {
           const prompt = `Bestimme die realistischen Nährwerte für exakt 100 Gramm der Zutat "${rawName}".
@@ -1658,47 +1659,33 @@ Antworte AUSSCHLIESSLICH mit validem JSON:
             generationConfig: { response_mime_type: "application/json", temperature: 0.2 }
           });
           const match = txt.match(/\{[\s\S]*\}/);
-          if (match) {
-            const parsed = JSON.parse(match[0]);
-            const cVal = Math.max(0, Number(parsed.carbs) || 0);
-            const sVal = Math.min(cVal, Math.max(0, Number(parsed.sugar) || 0));
-            const fVal = Math.max(0, Number(parsed.fat) || 0);
-            const sfVal = Math.min(fVal, Math.max(0, Number(parsed.saturatedFat) || 0));
-            const ufVal = parsed.unsaturatedFat !== undefined
-              ? Math.min(Math.max(0, fVal - sfVal), Math.max(0, Number(parsed.unsaturatedFat) || 0))
-              : Math.max(0, Math.round((fVal - sfVal) * 10) / 10);
-            targetFood = {
-              name: (parsed.name || rawName).trim(),
-              emoji: extractFirstEmoji(parsed.emoji, '🍽️'),
-              calories: Math.max(0, Math.round(Number(parsed.calories) || 100)),
-              protein: Math.max(0, Number(parsed.protein) || 0),
-              carbs: cVal,
-              sugar: sVal,
-              fat: fVal,
-              saturatedFat: sfVal,
-              unsaturatedFat: ufVal
-            };
-          }
+          if (!match) throw new Error("Ungültige KI-Antwort");
+          const parsed = JSON.parse(match[0]);
+          const cVal = Math.max(0, Number(parsed.carbs) || 0);
+          const sVal = Math.min(cVal, Math.max(0, Number(parsed.sugar) || 0));
+          const fVal = Math.max(0, Number(parsed.fat) || 0);
+          const sfVal = Math.min(fVal, Math.max(0, Number(parsed.saturatedFat) || 0));
+          const ufVal = parsed.unsaturatedFat !== undefined
+            ? Math.min(Math.max(0, fVal - sfVal), Math.max(0, Number(parsed.unsaturatedFat) || 0))
+            : Math.max(0, Math.round((fVal - sfVal) * 10) / 10);
+          targetFood = {
+            name: (parsed.name || rawName).trim(),
+            emoji: extractFirstEmoji(parsed.emoji, '🍽️'),
+            calories: Math.max(0, Math.round(Number(parsed.calories) || 100)),
+            protein: Math.max(0, Number(parsed.protein) || 0),
+            carbs: cVal,
+            sugar: sVal,
+            fat: fVal,
+            saturatedFat: sfVal,
+            unsaturatedFat: ufVal
+          };
         } catch (e) {
-          console.warn("KI-Zutat Fallback:", e);
+          console.warn("KI-Zutat Fehler:", e);
           alert(formatAiError(e, "Zutat konnte nicht berechnet werden"));
+          return;
         } finally {
           setIsAddingIngredient(false);
         }
-      }
-
-      if (!targetFood) {
-        targetFood = {
-          name: rawName,
-          emoji: '🍽️',
-          calories: 100,
-          protein: 0,
-          carbs: 0,
-          sugar: 0,
-          fat: 0,
-          saturatedFat: 0,
-          unsaturatedFat: 0
-        };
       }
     }
 
@@ -1782,6 +1769,7 @@ Antworte AUSSCHLIESSLICH mit validem JSON:
       totalCarbs: Math.round(totalC * 10) / 10,
       totalFat: Math.round(totalF * 10) / 10,
       // Serving info:
+      isRecipe: true,
       unitName: servings > 1 ? 'Portion' : 'Rezept',
       pieceWeight: Math.round(totalGrams / servings),
       estimatedPortionWeight: Math.round(totalGrams / servings),
@@ -2393,10 +2381,16 @@ Tagebuch-Daten: ${JSON.stringify(days.sort((a, b) => a.date.localeCompare(b.date
     }
   };
   const fetchBarcode = async code => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
     try {
       setIsThinking(true);
-      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`, {
+        signal: controller.signal
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
+      clearTimeout(timeoutId);
       if (data.status === 1) {
         const p = data.product;
         const pName = (p.product_name_de || p.product_name || "Unbekannt").trim();
@@ -2486,8 +2480,13 @@ Tagebuch-Daten: ${JSON.stringify(days.sort((a, b) => a.date.localeCompare(b.date
         alert("Produkt nicht gefunden.");
       }
     } catch (e) {
-      alert("Barcode Fehler: Keine Verbindung.");
+      if (e?.name === 'AbortError') {
+        alert("Barcode-Abfrage abgebrochen: Zeitüberschreitung (schlechter Empfang).");
+      } else {
+        alert("Barcode Fehler: Keine Verbindung.");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsThinking(false);
     }
   };
@@ -2718,6 +2717,12 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
       baseSaturatedFat: baseProps.saturatedFat,
       baseUnsaturatedFat: baseProps.unsaturatedFat
     };
+    const normBaseName = (baseProps.name || '').trim().toLowerCase();
+    const normFoodName = (food.name || '').trim().toLowerCase();
+    const matchesHistoryName = (n) => {
+      const low = String(n || '').trim().toLowerCase();
+      return Boolean(low) && (low === normBaseName || low === normFoodName);
+    };
     if (editingInstanceId) {
       setDailyLog(prev => ({
         ...prev,
@@ -2725,12 +2730,26 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
       }));
       setItemHistory(prev => {
         const safePrev = Array.isArray(prev) ? prev : [];
-        return safePrev.map(i => i.name === food.name || i.name === baseProps.name ? {
-          ...entry,
-          id: i.id || generateId(),
-          lastAmount: safeAmount,
-          count: i.count || 1
-        } : i);
+        let updated = false;
+        const result = [];
+        for (const i of safePrev) {
+          if (matchesHistoryName(i?.name)) {
+            if (!updated) {
+              updated = true;
+              result.push({
+                ...entry,
+                id: i.id || generateId(),
+                lastAmount: safeAmount,
+                count: i.count || 1
+              });
+            } else {
+              result[result.length - 1].count += (i.count || 1);
+            }
+          } else if (i) {
+            result.push(i);
+          }
+        }
+        return result;
       });
     } else {
       setDailyLog(prev => ({
@@ -2739,14 +2758,14 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
       }));
       setItemHistory(prev => {
         const safePrev = Array.isArray(prev) ? prev : [];
-        const existing = safePrev.find(i => i?.name === baseProps.name);
-        const newCount = existing && existing.count ? existing.count + 1 : 1;
-        const filtered = safePrev.filter(i => i?.name !== baseProps.name);
+        const existingMatches = safePrev.filter(i => matchesHistoryName(i?.name));
+        const prevCount = existingMatches.reduce((sum, i) => sum + (Number(i?.count) || 1), 0);
+        const filtered = safePrev.filter(i => i && !matchesHistoryName(i?.name));
         return [{
           ...entry,
           lastAmount: safeAmount,
           id: generateId(),
-          count: newCount
+          count: prevCount + 1
         }, ...filtered].slice(0, 50);
       });
     }
@@ -2825,7 +2844,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
               type="button"
               onClick=${() => {
                 if (customEmojiInput.trim()) {
-                  const chosen = [...customEmojiInput.trim()][0];
+                  const chosen = extractFirstEmoji(customEmojiInput, '');
                   if (chosen) emojiPickerConfig.onSelect(chosen);
                 }
                 setEmojiPickerConfig(null);
@@ -2854,6 +2873,10 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
               onClick=${() => {
                 triggerHaptic('light');
                 setShowApiKeyBanner(false);
+                setShowRecipeModal(false);
+                setShowActivityModal(false);
+                setShowAiCoach(false);
+                setShowAiModal(false);
                 setView('profile');
               }}
               className="w-full py-3.5 bg-brand-500 text-slate-950 rounded-2xl font-black text-xs uppercase tracking-wider shadow-lg active:scale-95 transition-all"
@@ -2879,7 +2902,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
         triggerHaptic('light');
         setShowDetails(null);
       }}/>
-      <div className="fixed bottom-2.5 left-2.5 right-2.5 z-[460] glass-card rounded-[2.5rem] p-5 sm:p-6 space-y-5 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto">
+      <div className="fixed bottom-2.5 left-2.5 right-2.5 max-w-md mx-auto z-[460] glass-card rounded-[2.5rem] p-5 sm:p-6 space-y-5 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90dvh] overflow-y-auto">
         <div>
           <div className="flex items-center gap-3.5 mb-1">
             <div className="text-3xl shrink-0">${showDetails?.emoji || "🍽️"}</div>
@@ -2974,7 +2997,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
         setSelectedFood(null);
         setEditingInstanceId(null);
       }}/>
-      <div className="fixed bottom-2.5 left-2.5 right-2.5 max-w-md mx-auto z-[460] glass-card rounded-[2.5rem] p-4 sm:p-5 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto overflow-x-clip">
+      <div className="fixed bottom-2.5 left-2.5 right-2.5 max-w-md mx-auto z-[460] glass-card rounded-[2.5rem] p-4 sm:p-5 shadow-2xl border border-white/10 animate-in slide-up duration-300 overscroll-contain max-h-[90dvh] overflow-y-auto overflow-x-clip">
         <div className="flex items-center gap-3 mb-3">
           <button onClick=${() => openEmojiPicker(selectedFood?.emoji || "🍽️", newEmoji => setSelectedFood(prev => ({ ...prev, emoji: newEmoji })))} className="w-11 h-11 shrink-0 bg-slate-800/80 rounded-[1.1rem] flex items-center justify-center text-2xl border border-white/10 shadow-inner hover:bg-slate-700 transition-colors">${selectedFood?.emoji || "🍽️"}</button>
           <input type="text" value=${selectedFood?.name || ""} placeholder="Name des Essens" onChange=${e => setSelectedFood({ ...selectedFood, name: e.target.value })} className="bg-transparent flex-1 min-w-0 text-xl sm:text-2xl font-black text-white outline-none border-b border-white/10 focus:border-brand-500"/>
@@ -3225,7 +3248,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
               ${Number((Number(selectedFood?.unsaturatedFat !== undefined ? selectedFood.unsaturatedFat : Math.max(0, (Number(selectedFood?.fat) || 0) - (Number(selectedFood?.saturatedFat) || 0))) || 0) * ((amount || 0) / 100)).toFixed(1).replace(/\.0$/, '')}<span className="text-[10px] pointer-events-none">g</span>
             </div>
           </div>
-        <button type="button" onPointerDown=${handleSafeAction(() => addEntry(selectedFood))} className="w-full mt-3 sm:mt-3.5 bg-brand-500 text-slate-950 py-3.5 sm:py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
+        <button type="button" onClick=${handleSafeAction(() => addEntry(selectedFood))} className="w-full mt-3 sm:mt-3.5 bg-brand-500 text-slate-950 py-3.5 sm:py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl active:scale-95 transition-all touch-manipulation flex items-center justify-center gap-3">${isThinking ? html`<${LoaderIcon} size=${20}/>` : editingInstanceId ? 'Aktualisieren' : 'Bestätigen'}</button>
       </div>`;
     })()}
     ${view === 'dashboard' && html`<div className="animate-in fade-in duration-500"><div className="flex justify-between items-center mb-4 mt-2"><div><h1 className="text-2xl font-black tracking-tighter italic text-white">Kalorien-Zähler</h1><div className="flex items-center gap-3 mt-1">
@@ -3292,8 +3315,10 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
     });
     setAmount(manualUnit ? manualUnit.pieceWeight : 100);
   }} className="bg-slate-900 border border-white/10 py-3 px-2 rounded-2xl font-black text-[10px] uppercase flex items-center justify-center gap-1.5 active:bg-slate-800 transition-colors text-white shadow-sm"><${PlusIcon} size=${15} className="text-brand-400"/> Manuell</button></div><input type="file" accept="image/*" capture="environment" ref=${aiFileRef} className="hidden" onChange=${async e => {
-    if (e.target.files[0]) {
-      const base64 = await resizeImage(e.target.files[0]);
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (file) {
+      const base64 = await resizeImage(file);
       setAiImage(base64);
       setShowAiModal(true);
     }
@@ -3326,7 +3351,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
             return html`
             <${SwipeableItem}
               key=${rec.id}
-              onSelect=${() => selectFood(rec)}
+              onSelect=${() => selectFood({ ...rec, isRecipe: true })}
               onDelete=${() => setRecipes(prev => prev.filter(r => r.id !== rec.id))}
             >
               <div className="glass-card px-4 py-3.5 rounded-[1.8rem] flex justify-between items-center gap-3 cursor-pointer active:scale-[0.99] transition-transform duration-150 bg-slate-900/90">
@@ -3347,7 +3372,7 @@ Antworte AUSSCHLIESSLICH mit einem einzigen, validen JSON-Objekt im folgenden Fo
                       </button>
                     </div>
                     <div className="text-[11px] font-bold text-slate-200 truncate mt-0.5">
-                      ${rWeight}g
+                      ${(Number(rec.servings) || 1) > 1 ? `1 Portion (${rWeight}g)` : `1 Rezept (${rWeight}g)`}
                     </div>
                   </div>
                 </div>
@@ -3554,7 +3579,7 @@ ${showRecipeModal && (() => {
 
   return html`
     <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => { triggerHaptic('light'); setShowRecipeModal(false); }}/>
-    <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10">
+    <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-[410] glass-card rounded-[3rem] p-6 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90dvh] overflow-y-auto shadow-2xl border border-white/10">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-black flex items-center gap-3 text-white">🥗 ${recipeDraft.id && recipes.some(r => r.id === recipeDraft.id) ? 'Rezept bearbeiten' : 'Rezept erstellen'}</h3>
         <button onClick=${() => { triggerHaptic('light'); setShowRecipeModal(false); }} className="p-2 bg-slate-800 rounded-full active:opacity-80 text-white"><${XIcon} size=${20}/></button>
@@ -3783,7 +3808,7 @@ ${showActivityModal && html`
     setActivityDraft(null);
     setActivityStep('input');
   }}/>
-  <div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 sm:p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-amber-500/30" onClick=${e => e.stopPropagation()}>
+  <div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-[410] glass-card rounded-[3rem] p-6 sm:p-8 space-y-6 animate-in slide-up duration-300 overscroll-contain max-h-[90dvh] overflow-y-auto shadow-2xl border border-amber-500/30" onClick=${e => e.stopPropagation()}>
     <div className="flex justify-between items-center">
       <h3 className="text-xl font-black flex items-center gap-3 text-amber-400">
         <${ZapIcon} className="text-amber-400" size=${22}/> KI-Aktivitäts-Tracker
@@ -3973,11 +3998,11 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
     triggerHaptic('light');
     setShowAiModal(false);
     setAiImage(null);
-  }}/><div className="fixed bottom-4 left-4 right-4 z-[410] glass-card rounded-[3rem] p-6 sm:p-8 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90vh] overflow-y-auto shadow-2xl border border-white/10"><div className="flex justify-between items-center"><h3 className="text-xl font-black flex items-center gap-3 text-white"><${CameraIcon} className="text-brand-400"/> Foto-Info</h3><button type="button" onClick=${() => {
+  }}/><div className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-[410] glass-card rounded-[3rem] p-6 sm:p-8 space-y-5 animate-in slide-up duration-300 overscroll-contain max-h-[90dvh] overflow-y-auto shadow-2xl border border-white/10"><div className="flex justify-between items-center"><h3 className="text-xl font-black flex items-center gap-3 text-white"><${CameraIcon} className="text-brand-400"/> Foto-Info</h3><button type="button" onClick=${() => {
     triggerHaptic('light');
     setShowAiModal(false);
     setAiImage(null);
-  }} className="p-2 bg-slate-800 rounded-full text-white active:opacity-80"><${XIcon} size=${20}/></button></div><img src=${aiImage} className="w-full h-44 object-cover rounded-3xl border border-white/10 shadow-2xl"/><textarea placeholder="Was genau ist zu sehen?..." value=${aiDesc} onChange=${e => setAiDesc(e.target.value)} onBlur=${() => window.scrollTo(0, 0)} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none text-sm h-20 font-medium text-white shadow-inner"/><div className="flex flex-col gap-3"><button type="button" onPointerDown=${handleSafeAction(() => !isThinking && askGemini(aiDesc, aiImage))} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all touch-manipulation shadow-xl">${isThinking ? html`<${LoaderIcon} size=${20}/>` : html`<${CheckIcon} size=${20}/> Absenden`}</button><button type="button" onClick=${() => {
+  }} className="p-2 bg-slate-800 rounded-full text-white active:opacity-80"><${XIcon} size=${20}/></button></div><img src=${aiImage} className="w-full h-44 object-cover rounded-3xl border border-white/10 shadow-2xl"/><textarea placeholder="Was genau ist zu sehen?..." value=${aiDesc} onChange=${e => setAiDesc(e.target.value)} onBlur=${() => window.scrollTo(0, 0)} className="w-full p-5 bg-slate-900 border border-white/5 rounded-2xl focus:ring-2 focus:ring-brand-500 outline-none text-sm h-20 font-medium text-white shadow-inner"/><div className="flex flex-col gap-3"><button type="button" onClick=${handleSafeAction(() => !isThinking && askGemini(aiDesc, aiImage))} className="w-full py-6 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all touch-manipulation shadow-xl">${isThinking ? html`<${LoaderIcon} size=${20}/>` : html`<${CheckIcon} size=${20}/> Absenden`}</button><button type="button" onClick=${() => {
     triggerHaptic('light');
     setShowAiModal(false);
     setAiImage(null);
@@ -4074,7 +4099,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'kalorien_tracker_backup.json';
+      a.download = `kalorien_backup_${getLocalToday()}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -4085,7 +4110,8 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
       document.getElementById('import-file').click();
     }} className="flex-1 bg-slate-800/50 border border-white/10 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:bg-slate-800 transition-all">Importieren</button>
     <input type="file" id="import-file" accept=".json" className="hidden" onChange=${(e) => {
-      const file = e.target.files[0];
+      const file = e.target.files && e.target.files[0];
+      e.target.value = '';
       if (!file) return;
       const reader = new FileReader();
       reader.onload = (ev) => {
@@ -4110,7 +4136,7 @@ ${showAiModal && html`<div className="fixed inset-0 bg-slate-950/95 z-[400] back
   <div className="pt-4 border-t border-white/5 space-y-2.5">
     <div className="flex items-center justify-between px-1">
       <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">App & Version</span>
-      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v4.9 Live</span>
+      <span className="text-[10px] font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full border border-brand-500/20">v5.0 Live</span>
     </div>
     <button 
       type="button" 
@@ -4137,7 +4163,7 @@ ${showCalendarModal && (() => {
 
   return html`
     <div className="fixed inset-0 bg-slate-950/95 z-[400] backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => { triggerHaptic('light'); setShowCalendarModal(false); }}/>
-    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-[410] glass-card rounded-[3rem] p-6 space-y-4 animate-in slide-up duration-300 shadow-2xl border border-white/10 max-h-[90vh] overflow-y-auto">
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md z-[410] glass-card rounded-[3rem] p-6 space-y-4 animate-in slide-up duration-300 shadow-2xl border border-white/10 overscroll-contain max-h-[90dvh] overflow-y-auto">
       <div className="flex justify-between items-center mb-2">
         <button onClick=${() => {
           triggerHaptic('light');
@@ -4202,7 +4228,7 @@ ${showCalendarModal && (() => {
 
 ${showAiCoach && html`
   <div className="fixed inset-0 bg-slate-950/95 z-[400] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xl animate-in fade-in duration-300" onClick=${() => { if (!isAiCoachLoading) { triggerHaptic('light'); setShowAiCoach(false); } }}>
-    <div className="w-full max-w-md glass-card rounded-[2.5rem] p-6 space-y-5 animate-in zoom-in duration-200 overflow-y-auto max-h-[85vh]" onClick=${e => e.stopPropagation()}>
+    <div className="w-full max-w-md glass-card rounded-[2.5rem] p-6 space-y-5 animate-in zoom-in duration-200 overscroll-contain overflow-y-auto max-h-[85dvh]" onClick=${e => e.stopPropagation()}>
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-black flex items-center gap-3"><${SparklesIcon} className="text-brand-400"/> Ernährungs-Coach</h3>
         <button onClick=${() => { if (!isAiCoachLoading) { triggerHaptic('light'); setShowAiCoach(false); } }} className="p-2 bg-slate-800 rounded-full active:opacity-80"><${XIcon} size=${20}/></button>
@@ -4210,14 +4236,14 @@ ${showAiCoach && html`
       
       ${!aiCoachResult && !isAiCoachLoading && html`
         <div className="space-y-6">
-          <div className="flex items-center justify-center gap-5 w-full my-2">
-            <div className="w-36 shrink-0 space-y-1.5 text-center">
+          <div className="grid grid-cols-2 gap-3 w-full my-2">
+            <div className="min-w-0 space-y-1.5 text-center">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Von</label>
-              <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="w-full py-2.5 px-2 bg-slate-900 border border-white/15 rounded-2xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-2 focus:ring-brand-500/50 block"/>
+              <input type="date" value=${aiCoachStart} onChange=${e => setAiCoachStart(e.target.value)} className="min-w-0 w-full py-2.5 px-2 bg-slate-900 border border-white/15 rounded-2xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-2 focus:ring-brand-500/50 block"/>
             </div>
-            <div className="w-36 shrink-0 space-y-1.5 text-center">
+            <div className="min-w-0 space-y-1.5 text-center">
               <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">Bis</label>
-              <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="w-full py-2.5 px-2 bg-slate-900 border border-white/15 rounded-2xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-2 focus:ring-brand-500/50 block"/>
+              <input type="date" value=${aiCoachEnd} onChange=${e => setAiCoachEnd(e.target.value)} className="min-w-0 w-full py-2.5 px-2 bg-slate-900 border border-white/15 rounded-2xl text-white outline-none text-xs font-semibold text-center shadow-inner focus:ring-2 focus:ring-brand-500/50 block"/>
             </div>
           </div>
           <button onClick=${runAiCoach} className="w-full py-5 bg-brand-500 text-slate-950 rounded-[2rem] font-black uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl">Analyse starten</button>
@@ -4296,7 +4322,7 @@ if ('serviceWorker' in navigator) {
   };
 
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js?v=4.9').then(reg => {
+    navigator.serviceWorker.register('./sw.js?v=5.0').then(reg => {
       checkSwUpdate();
       setInterval(checkSwUpdate, 15 * 60 * 1000);
     }).catch(err => console.log('SW registration:', err));
